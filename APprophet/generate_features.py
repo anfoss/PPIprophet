@@ -5,6 +5,10 @@ import numpy as np
 from scipy import stats
 import pandas as pd
 from scipy.ndimage import uniform_filter
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.models import model_from_json
+
 
 import APprophet.io_ as io
 import APprophet.stats_ as st
@@ -113,25 +117,25 @@ class ComplexProfile(object):
         # add np.nan to reach 72
         self.cor.append(np.hstack((D / np.sqrt(ssAs * ssBs), np.zeros(9) + np.nan)))
 
-    def align_peaks(self):
+    def align_peaks(self, skip=5):
         """
         align all protein peaks
         """
         # now we need to create the align file for each protein in this cmplx
         pk = [prot.get_peaks() for prot in self.members]
-        # just check if there is a shift of more than 5
-        if abs(pk[0][0] - pk[1][0]) > 5:
-            return False
         idx_missing = [i for i, j in enumerate(pk) if not j]
         nan_members = [self.get_members()[i] for i in idx_missing]
         pres = [x for x in pk if x]
         mb_pres = [x for x in self.get_members() if x not in nan_members]
         if nan_members == self.get_members():
             self.pks_ali = dict(zip(nan_members, [np.nan] * len(nan_members)))
-            return None
+            return False
         else:
             ali_pk = alligner(pres)
-            md = round(st.medi(ali_pk))
+            # mean only 2 peaks
+            md = round(st.mean(ali_pk))
+            if md >= skip:
+                return False
             # missing values gets the median of aligned peaks
             self.pks_ali = dict(zip(nan_members, [md] * len(nan_members)))
             self.pks_ali.update(dict(zip(mb_pres, ali_pk)))
@@ -341,6 +345,24 @@ def mp_cmplx(filename):
                 [peaks_file.append(x) for x in list(peaks)]
     return feat_file, peaks_file
 
+
+def predict(base, model="./APprophet/APprophet_dnn.h5"):
+    """
+    get model file and run prediction
+    """
+    infile = os.path.join(base, "mp_feat_norm.txt")
+    X, memo = io.prepare_feat(infile)
+    model = tf.keras.models.load_model(modelname)
+    yhat_probs = model.predict(X_test, verbose=0)
+    pos = np.array(["Yes" if x == 1 else "No" for x in model.predict_cl(X)])
+    out = np.concatenate((memo, prob, pos.reshape(-1, 1)), axis=1)
+    header = ["ID", "NEG", "POS", "IS_CMPLX"]
+    df = pd.DataFrame(out, columns=header)
+    df = df[["ID", "POS", "NEG", "IS_CMPLX"]]
+    outfile = os.path.join(base, "dnn.txt")
+    df.to_csv(outfile, sep="\t", index=False)
+    return True
+
 @io.timeit
 def runner(base):
     """
@@ -364,3 +386,4 @@ def runner(base):
     peaklist_path = os.path.join(base, "peak_list.txt")
     # peaklist_path = peaklist_path
     io.wrout(pks, peaklist_path, ["MB", "ID", "PKS", "SEL"])
+    predict(base)

@@ -86,7 +86,7 @@ def main():
     files = [os.path.abspath(x) for x in files.keys()]
     for infile in files:
         # validate.InputTester(infile, 'in').test_file()
-        preprocess.runner(infile)
+        # preprocess.runner(infile)
         tmp_folder = io.file2folder(infile, prefix=config['GLOBAL']['temp'])
         gen_feat.runner(tmp_folder)
         assert False
