@@ -8,7 +8,7 @@ import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 import joblib
 
-import PCprophet.io_ as io
+import APprophet.io_ as io
 
 
 def deserialize(model):
@@ -27,7 +27,7 @@ def test_model():
 
 
 # old rf_equal.clf
-def runner(base, model="./PCprophet/rf_equal.clf"):
+def runner(base, model="./APprophet/rf_equal.clf"):
     """
     get model file and run prediction
     """

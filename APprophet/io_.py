@@ -262,10 +262,13 @@ def read_txt(path, first_col="GN"):
             temp = dict(zip(header, things))
         if temp:
             HoA[temp.get("GN")] = []
-            for key in header:
+            # skip first header (i.e identifier)
+            for key in header[1:]:
                 try:
                     HoA[temp.get("GN")].append(float(temp[key]))
-                except ValueError:
+                except ValueError as e:
+                    print (e)
+                    raise e
                     continue
     return HoA
 
@@ -321,20 +324,6 @@ def read_combined(combfile):
     return HoA
 
 
-def create_db_from_cluster(nodes, clusters):
-    idx = 1
-    ids = "ppi"
-    header = ["ComplexID", "ComplexName", "subunits(Gene name)"]
-    path = resource_path("./ppi_db.txt")
-    create_file(path, header)
-    for cmplx in clusters:
-        nm = ";".join([nodes[x] for x in list(cmplx)])
-        tmp = "_".join([ids, str(idx)])
-        dump_file(path, "\t".join([str(idx), tmp, nm]))
-        idx += 1
-    return True
-
-
 def file2folder(file_, prefix="./tmp/"):
     ## we are already stripping the extension
     filename = os.path.splitext(os.path.basename(file_))[0]
@@ -354,24 +343,6 @@ def catch(func, handle=lambda e: e, *args, **kwargs):
         return func(*args, **kwargs)
     except Exception as e:
         return handle(e)
-
-
-def split_hypo_db(pred, ref_cmplx, cmplx_ann):
-    """
-    read prediction ref cmplx and cmplx and return the positive
-    """
-    pred = pd.read_csv(pred, sep="\t", index_col=False)
-    ref_cmplx = pd.read_csv(ref_cmplx, sep="\t")
-    ann = pd.read_csv(cmplx_ann, sep="\t")
-    on = ["ID"]
-    xx = lambda x, y, on: pd.merge(x, y, how="left", left_on=on, right_on=on)
-    mrg = xx(ann, xx(pred, ref_cmplx, on), ["ID"])
-    pos = mrg["IS_CMPLX"] == "Yes"
-    mrg = mrg[pos]
-    # split in hypothesis and db and then return
-    hyp = mrg[(mrg.ANN == 0)]
-    db = mrg[mrg.ANN == 1]
-    return hyp, db
 
 
 def uniqueid():
