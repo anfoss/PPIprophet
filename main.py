@@ -16,8 +16,7 @@ from APprophet import exceptions as exceptions
 from APprophet import validate_input as validate
 from APprophet import generate_features as gen_feat
 from APprophet import preprocess as preprocess
-from APprophet import score_network as score_network
-from APprophet import collapse_all as collapse
+from APprophet import score as score
 
 
 class ParserHelper(argparse.ArgumentParser):
@@ -91,10 +90,10 @@ def main():
         pass
         # gen_feat.runner(tmp_folder)
     # assert False
-    collapse.runner(
-                    tmp_=config['GLOBAL']['temp'],
-                    ids=config['GLOBAL']['sid']
-                    )
+    score.runner(
+                tmp_=config['GLOBAL']['temp'],
+                ids=config['GLOBAL']['sid']
+                )
 
 
 

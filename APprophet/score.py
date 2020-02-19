@@ -1,16 +1,19 @@
 # !/usr/bin/env python3
 
-from sklearn.model_selection import KFold
-from sklearn.mixture import GaussianMixture
+import sys
+import os
+import itertools
+from functools import reduce
+
 
 import pandas as pd
 import numpy as np
-
-
-import numpy as np
 import networkx as nx
 from sklearn.decomposition import NMF
+from sklearn.model_selection import KFold
+from sklearn.mixture import GaussianMixture
 
+from APprophet import io_ as io
 
 
 class Estimator(object):
@@ -204,28 +207,163 @@ class DANMF(Estimator):
                 self._update_V(i)
 
 
-def estimate_n_clusters(combined):
+class NetworkCombiner(object):
     """
-    Find the best number of clusters through maximization of the log-likelihood from expecation maximization
+    Combine all replicates for a single condition into a network
+    returns a network
     """
-    last_llh = None
-    kf = KFold(n_splits=10, shuffle=True)
-    components = range(50)[1:]
-    X = combined.drop(['ProtA', 'ProtB']).values()
-    for n_components in components:
-        gm = GaussianMixture(n_components=n_components)
-        llh_list = []
-        for train, test in kf.split(X):
-            gm.fit(X[train, :])
-            if not gm.converged_:
-               raise Warning("GM not converged")
-            llh = -gm.score_samples(X[test, :])
-            llh_list += llh.tolist()
-        avg_llh = np.average(llh_list)
-        print(avg_llh)
-        if last_llh is None:
-            last_llh = avg_llh
-        elif avg_llh+10E-6 <= last_llh:
-            return n_components-1
-        last_llh = avg_llh
-    return last_llh
+    def __init__(self):
+        super(NetworkCombiner, self).__init__()
+        self.exps = []
+        self.adj_matrx = None
+        self.networks = None
+        self.dfs = []
+        self.ids = None
+        self.combined = None
+
+    def add_exp(self, exp):
+        self.exps.append(exp)
+
+    def create_dfs(self):
+        [self.dfs.append(x.get_df()) for x in self.exps]
+
+    def combine_graphs(self, l):
+        """
+        fill graphs with all proteins missing and weight 0 (i.e no connection)
+        """
+        ids_all = list(set([x.split('_')[0] for x in l]))
+        # fill graph
+        self.networks = [x.fill_graph(ids_all) for x in self.exps]
+        return True
+
+    def adj_matrix_multi(self):
+        """
+        add sparse adj matrix to the adj_matrix container
+        """
+        all_adj = []
+        for G in self.networks:
+            adj = nx.adjacency_matrix(
+                                    G,
+                                    nodelist=sorted(G.nodes()),
+                                    weight='weight'
+                                    )
+            self.ids = sorted(G.nodes())
+            all_adj.append(adj.todense())
+        # now multiply
+        self.adj_matrx = all_adj.pop()
+        for m1 in all_adj:
+            self.adj_matrx = np.matmul(self.adj_matrx, m1)
+        return self.adj_matrx
+
+    def multi_collapse(self, name):
+        self.combined = reduce(lambda x, y: pd.merge(x, y,
+                                            on = ['ProtA', 'ProtB'],
+                                            how='outer'),
+                    self.dfs)
+        self.combined.fillna(0)
+        self.combined.to_csv(name, sep="\t", index=False)
+
+    def get_ids(self):
+        return self.ids
+
+
+class TableConverter(object):
+    """docstring for TableConverter"""
+    def __init__(self, name, table, cond):
+        super(TableConverter, self).__init__()
+        self.name = name
+        self.table = table
+        self.df = None
+        self.cond = cond
+        self.G = nx.Graph()
+        self.adj = None
+
+    def clean_name(self, col):
+        self.df[col] = self.df[col].str.split('_').str[0]
+
+    def convert_to_network(self):
+        self.df = pd.read_csv(self.table, sep="\t")
+        self.clean_name('ProtA')
+        self.clean_name('ProtB')
+        for row in self.df.itertuples():
+            self.G.add_edge(row[1], row[2], weight=row[3])
+        return True
+
+    def fill_graph(self, ids):
+        G2 = fully_connected(ids)
+        [self.G.add_edge(*p, weight=0) for p in G2.edges() if not self.G.has_edge(p[0], p[1])]
+        return self.G
+
+    def weight_adj_matrx(self, path, write=False):
+        self.adj = nx.adjacency_matrix(
+                                        self.G,
+                                        nodelist=sorted(self.G.nodes()), weight='weight'
+                                        )
+        self.adj = self.adj.todense()
+        if write:
+            nm = os.path.join(path, 'adj_matrix.txt')
+            np.savetxt(nm, self.adj, delimiter="\t")
+        return True
+
+    def get_adj_matrx(self):
+        return self.adj
+
+    def get_df(self):
+        return self.df
+
+
+def fully_connected(l, create_using=None):
+    G = nx.Graph()
+    [G.add_edge(u,q, weight=0) for u,q in itertools.combinations(l,2)]
+    return G
+
+
+def runner(tmp_, ids):
+    """
+    read folder tmp in directory.
+    then loop for each file and create a combined file which contains all files
+    creates in the tmp directory
+    """
+    dir_ = []
+    dir_ = [x[0] for x in os.walk(tmp_) if x[0] is not tmp_]
+    exp_info = io.read_sample_ids(ids)
+    strip = lambda x: os.path.splitext(os.path.basename(x))[0]
+    exp_info = {strip(k): v for k, v in exp_info.items()}
+    wrout = []
+    allexps = NetworkCombiner()
+    allids = []
+    for smpl in dir_:
+        base = os.path.basename(os.path.normpath(smpl))
+        if not exp_info.get(base, None):
+            continue
+        print(base, exp_info[base])
+        pred_out = os.path.join(smpl, "dnn.txt")
+        raw_matrix = os.path.join(smpl, "transf_matrix.txt")
+        allids.extend(list(pd.read_csv(raw_matrix, sep="\t")['ID']))
+        exp = TableConverter(
+            name=exp_info[base],
+            table=pred_out,
+            cond=pred_out
+        )
+        # create base network
+        exp.convert_to_network()
+        # exp.weight_adj_matrx(path=smpl)
+        allexps.add_exp(exp)
+    allexps.create_dfs()
+    # combine all individual graphs
+    allexps.combine_graphs(allids)
+    # extract combined adjancency matrix for all samples
+    m_adj = allexps.adj_matrix_multi()
+    ids = allexps.get_ids()
+    G = nx.from_numpy_matrix(np.array(m_adj))
+    clf = DANMF()
+    clf.fit(G)
+    ids = dict(zip(range(0, len(ids)), ids))
+    outname = os.path.join(tmp_, "combined.txt")
+    allexps.multi_collapse(outname)
+    out = []
+    for k,v in clf.get_memberships().items():
+        out.append([k,ids[k], v])
+    out = pd.DataFrame(out, columns=['IDX', 'Identifier', 'Community'])
+    outname = os.path.join(tmp_, "communities.txt")
+    out.to_csv(outname, sep="\t")
