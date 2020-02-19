@@ -410,7 +410,7 @@ def prepare_feat(infile, thresh=1, missing=["nan", "na", "", None, "n", "-"]):
     read infile and split it
     """
     feat = pd.read_csv(infile, sep="\t", na_values=missing)
-    memos = feat[["ID"]]
+    memos = feat[["MB"]]
     torm = ["ID", "MB"]
     feat.drop(torm, axis=1, inplace=True)
     cor = split_to_df(feat, "COR")

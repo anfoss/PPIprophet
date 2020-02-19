@@ -115,7 +115,7 @@ class ComplexProfile(object):
         ssBs = np.einsum("ij,ij->j", dbm, dbm)
         D = np.einsum("ij,ij->j", dam, dbm)
         # add np.nan to reach 72
-        self.cor.append(np.hstack((D / np.sqrt(ssAs * ssBs), np.zeros(9) + np.nan)))
+        self.cor = np.hstack((D / np.sqrt(ssAs * ssBs), np.zeros(9) + np.nan))
 
     def align_peaks(self, skip=5):
         """
@@ -157,20 +157,22 @@ class ComplexProfile(object):
         self.calc_shift([x.get_acc() for x in self.members])
 
     def calc_shift(self, ids):
-        self.shifts.append(abs(self.pks_ali[ids[0]] - self.pks_ali[ids[1]]))
+        self.shifts = abs(self.pks_ali[ids[0]] - self.pks_ali[ids[1]])
 
     def calc_diff(self, p1, p2):
-        self.diff.append(abs(p1.get_inte() - p2.get_inte()))
+        self.diff = abs(p1.get_inte() - p2.get_inte())
 
     def calc_width(self):
-        q = 5
-        width = []
-        for prot in self.members:
-            peak = int(self.pks_ali[prot.get_acc()])
-            prot_peak = prot.get_inte()[(peak - q) : (peak + q)]
-            prot_fwhm = st.fwhm(list(prot_peak))
-            width.append(prot_fwhm)
-        self.width = np.mean(width)
+        q = 2
+        # width = []
+        # for prot in self.members:
+        #     peak = int(self.pks_ali[prot.get_acc()])
+        #     prot_peak = prot.get_inte()[(peak - q) : (peak + q)]
+        #     prot_fwhm = st.fwhm(list(prot_peak))
+        #     width.append(prot_fwhm)
+        # print(width)
+        self.width = 4
+        # to change!
 
     def create_row(self):
         """
@@ -188,6 +190,7 @@ class ComplexProfile(object):
             dif_conc,
             str(self.width),
         ]
+        row = [x.replace("\n", "") for x in row]
         return "\t".join([str(x) for x in row])
 
 
@@ -243,6 +246,7 @@ def min_sd(aoa):
         except IndexError as e:
             indx.append(None)
     return indx
+
 
 def shortest_path(aoa, max_trial=100):
     elements = len(aoa)
@@ -346,22 +350,27 @@ def mp_cmplx(filename):
     return feat_file, peaks_file
 
 
-def predict(base, model="./APprophet/APprophet_dnn.h5"):
+def predict(base, modelname="./APprophet/APprophet_dnn.h5"):
     """
     get model file and run prediction
     """
     infile = os.path.join(base, "mp_feat_norm.txt")
     X, memo = io.prepare_feat(infile)
+    X = X.astype(np.float64)
     model = tf.keras.models.load_model(modelname)
-    yhat_probs = model.predict(X_test, verbose=0)
-    pos = np.array(["Yes" if x == 1 else "No" for x in model.predict_cl(X)])
-    out = np.concatenate((memo, prob, pos.reshape(-1, 1)), axis=1)
-    header = ["ID", "NEG", "POS", "IS_CMPLX"]
+    yhat_probs = model.predict(X, verbose=0)
+    out = np.concatenate((memo, yhat_probs.reshape(-1, 1)), axis=1)
+    # now add the two proteins
+    header = ["MB", "Prob"]
     df = pd.DataFrame(out, columns=header)
-    df = df[["ID", "POS", "NEG", "IS_CMPLX"]]
+    # split header
+    df['ProtA'], df['ProtB'] = df['MB'].str.split('#', 1).str
+    df.drop('MB', inplace=True)
+    df = df[['ProtA', 'ProtB', 'Prob']]
     outfile = os.path.join(base, "dnn.txt")
     df.to_csv(outfile, sep="\t", index=False)
     return True
+
 
 @io.timeit
 def runner(base):
@@ -369,21 +378,19 @@ def runner(base):
     generate all features from the mapped complexes file
     base = config[GLOBAL][TEMP]filename
     """
-    # get tmp/filename folder
-    cmplx_comb = os.path.join(base, "ppi.txt")
-    print(os.path.dirname(os.path.realpath(__file__)))
-    wr, pks = mp_cmplx(filename=cmplx_comb)
-    feature_path = os.path.join(base, "mp_feat_norm.txt")
-    feat_header = [
-        "ID",
-        "MB",
-        "COR",
-        "SHFT",
-        "DIF",
-        "W",
-    ]
-    io.wrout(wr, feature_path, feat_header)
-    peaklist_path = os.path.join(base, "peak_list.txt")
-    # peaklist_path = peaklist_path
-    io.wrout(pks, peaklist_path, ["MB", "ID", "PKS", "SEL"])
+    # cmplx_comb = os.path.join(base, "ppi.txt")
+    # print(os.path.dirname(os.path.realpath(__file__)))
+    # wr, pks = mp_cmplx(filename=cmplx_comb)
+    # feature_path = os.path.join(base, "mp_feat_norm.txt")
+    # feat_header = [
+    #     "ID",
+    #     "MB",
+    #     "COR",
+    #     "SHFT",
+    #     "DIF",
+    #     "W",
+    # ]
+    # io.wrout(wr, feature_path, feat_header)
+    # peaklist_path = os.path.join(base, "peak_list.txt")
+    # io.wrout(pks, peaklist_path, ["MB", "ID", "PKS", "SEL"])
     predict(base)
