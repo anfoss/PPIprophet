@@ -37,10 +37,11 @@ class ProteinProfile(object):
         pks = None
         if pick:
             pks = list(st.peak_picking(self.inten)[0])
+            self.peaks = [int(x) for x in pks]
         else:
-            pks = self.inten.index(max(self.inten))
+            self.peaks = [int(np.argmax(self.inten))]
         # avoid breakage due to float
-        self.peaks = [int(x) for x in pks]
+
 
 
 class ComplexProfile(object):

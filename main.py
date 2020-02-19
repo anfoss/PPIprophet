@@ -17,6 +17,7 @@ from APprophet import validate_input as validate
 from APprophet import generate_features as gen_feat
 from APprophet import preprocess as preprocess
 from APprophet import score_network as score_network
+from APprophet import collapse_all as collapse
 
 
 class ParserHelper(argparse.ArgumentParser):
@@ -86,14 +87,16 @@ def main():
     files = [os.path.abspath(x) for x in files.keys()]
     for infile in files:
         # validate.InputTester(infile, 'in').test_file()
-        tmp_folder = io.file2folder(infile, prefix=config['GLOBAL']['temp'])
+        # tmp_folder = io.file2folder(infile, prefix=config['GLOBAL']['temp'])
         preprocess.runner(infile)
+        assert False
+        pass
         # gen_feat.runner(tmp_folder)
-    assert False
-    score_network.runner(
-                        tmp_=config['GLOBAL']['temp'],
-                        ids=config['GLOBAL']['sid']
-                        )
+    # assert False
+    collapse.runner(
+                    tmp_=config['GLOBAL']['temp'],
+                    ids=config['GLOBAL']['sid']
+                    )
 
 
 

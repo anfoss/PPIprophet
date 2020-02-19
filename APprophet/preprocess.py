@@ -15,24 +15,24 @@ def center_arr(hoa, fr_nr="all", smooth=False, stretch=(True, 72)):
     norm = {}
     for k in hoa:
         key = hoa[k]
-        key = baseline_als(key)
-        if fr_nr != "all":
-            key = key[0:(fr_nr)]
         # if less than 2 real values
         if len([x for x in key if x > 0]) < 2:
             continue
+        key = st.impute_namean(key)
+        key = baseline_als(key)
+        if fr_nr != "all":
+            key = key[0:(fr_nr)]
         if smooth:
             key = st.gauss_filter(key, sigma=1, order=0)
-        key = st.impute_namean(key)
         if stretch[0]:
             # input original length wanted length
             key = st.resample(key, len(key), output_fr=stretch[1])
-        key = st.resize(key)
+        # key = st.resize(key)
         norm[k] = list(key)
     return norm
 
 
-def baseline_als(y, lam=50, p=0.1, niter=10):
+def baseline_als(y, lam=10, p=0.5, niter=100, pl=True):
     """
     perform baseline correction
     https://stackoverflow.com/questions/29156532/python-baseline-correction-library
@@ -43,22 +43,26 @@ def baseline_als(y, lam=50, p=0.1, niter=10):
     from scipy import sparse
     from scipy.sparse.linalg import spsolve
     import matplotlib.pyplot as plt
-    fig = plt.figure()
-    ax = plt.subplot(111)
-    ax.plot(list(range(0,75)), y, label='not rescaled')
+
     y = np.array(y)
     L = len(y)
     D = sparse.diags([1,-2,1],[0,-1,-2], shape=(L,L-2))
+    D = lam * D.dot(D.transpose())
     w = np.ones(L)
+    W = sparse.spdiags(w, 0, L, L)
     for i in range(niter):
-        W = sparse.spdiags(w, 0, L, L)
-        Z = W + lam * D.dot(D.transpose())
+        W.setdiag(w)
+        Z = W + D
         z = spsolve(Z, w*y)
         w = p * (y > z) + (1-p) * (y < z)
-    ax.plot(list(range(0,75)), z, label='rescaled')
-    plt.legend()
-    plt.show()
-    plt.close()
+    if pl:
+        fig = plt.figure()
+        ax = plt.subplot(111)
+        ax.plot(list(range(0,75)), y, label='not rescaled')
+        ax.plot(list(range(0,75)), z, label='rescaled')
+        plt.legend()
+        plt.show()
+        plt.close()
     return list(z)
 
 
