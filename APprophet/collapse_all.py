@@ -8,6 +8,7 @@ from scipy.sparse import hstack
 import scipy
 import networkx as nx
 from functools import reduce
+import itertools
 
 from APprophet import io_ as io
 
@@ -17,20 +18,14 @@ class NetworkCombiner(object):
     """
     Combine all replicates for a single condition into a network
     returns a network
-
-
-    Attributes:
-        attr1 (str): Description of `attr1`.
-        attr2 (:obj:`int`, optional): Description of `attr2`.
-
     """
-
     def __init__(self):
         super(NetworkCombiner, self).__init__()
         self.exps = []
         self.adj_matrx = pd.DataFrame()
         self.networks = None
         self.dfs = []
+        self.ids = None
         self.combined = None
 
     def add_exp(self, exp):
@@ -39,34 +34,30 @@ class NetworkCombiner(object):
     def create_dfs(self):
         [self.dfs.append(x.get_df()) for x in self.exps]
 
-    def add_sparse_adj(self, network):
+    def combine_graphs(self, l):
+        """
+        fill graphs with all proteins missing and weight 0 (i.e no connection)
+        """
+        ids_all = list(set(l))
+        # fill graph
+        self.networks = [x.fill_graph(ids_all) for x in self.exps]
+        self.ids = ids_all
+        return True
+
+    def adj_matrix_multi(self, network):
         """
         add sparse adj matrix to the adj_matrix container
         """
-        self.adj_matrx = [hstack((self.adj_matrx, X.get_adj_matrx)) for x in self.exps]
+        adj = []
+        for G in self.networks:
+            self.adj = nx.adjacency_matrix(
+                                            G,
+                                            nodelist=sorted(G.nodes()), weight='weight'
+                                            )
+            self.adj = self.adj.todense()
+            print(self.adj.shape)
+        # now sum all adj matrixes to keep the max
         return True
-
-    # def matrix_factorization(R, P, Q, K, steps=5000, alpha=0.0002, beta=0.02):
-    # Q = Q.T
-    # for step in range(steps):
-    #     for i in range(len(R)):
-    #         for j in range(len(R[i])):
-    #             if R[i][j] > 0:
-    #                 eij = R[i][j] - np.dot(P[i,:],Q[:,j])
-    #                 for k in range(K):
-    #                     P[i][k] = P[i][k] + alpha * (2 * eij * Q[k][j] - beta * P[i][k])
-    #                     Q[k][j] = Q[k][j] + alpha * (2 * eij * P[i][k] - beta * Q[k][j])
-    #     eR = np.dot(P,Q)
-    #     e = 0
-    #     for i in range(len(R)):
-    #         for j in range(len(R[i])):
-    #             if R[i][j] > 0:
-    #                 e = e + pow(R[i][j] - np.dot(P[i,:],Q[:,j]), 2)
-    #                 for k in range(K):
-    #                     e = e + (beta/2) * (pow(P[i][k],2) + pow(Q[k][j],2))
-    #     if e < 0.001:
-    #         break
-    # return P, Q.T
 
     def multi_collapse(self, name):
         self.combined = reduce(lambda x, y: pd.merge(x, y,
@@ -76,6 +67,17 @@ class NetworkCombiner(object):
         self.combined.fillna(0)
         self.combined.to_csv(name, sep="\t", index=False)
 
+    def predict_membership(self):
+        """
+        performs overlapping community dectection from the factorize_adj_matrix
+        uses # XXX:
+        """
+        pass
+
+    def factorize_adj_matrix(self):
+        """
+        """
+        pass
 
 
 class TableConverter(object):
@@ -100,14 +102,20 @@ class TableConverter(object):
             self.G.add_edge(row[1], row[2], weight=row[3])
         return True
 
-    def weight_adj_matrx(self, path):
+    def fill_graph(self, ids):
+        G2 = fully_connected(ids)
+        [self.G.add_edge(*p, weight=0) for p in G2.edges() if not self.G.has_edge(p[0], p[1])]
+        return True
+
+    def weight_adj_matrx(self, path, write=False):
         self.adj = nx.adjacency_matrix(
                                         self.G,
                                         nodelist=sorted(self.G.nodes()), weight='weight'
                                         )
         self.adj = self.adj.todense()
-        nm = os.path.join(path, 'adj_matrix.txt')
-        np.savetxt(nm, self.adj, delimiter="\t")
+        if write:
+            nm = os.path.join(path, 'adj_matrix.txt')
+            np.savetxt(nm, self.adj, delimiter="\t")
         return True
 
     def get_adj_matrx(self):
@@ -115,6 +123,12 @@ class TableConverter(object):
 
     def get_df(self):
         return self.df
+
+
+def fully_connected(l, create_using=None):
+    G = nx.Graph()
+    [G.add_edge(u,q, weight=0) for u,q in itertools.combinations(l,2)]
+    return G
 
 
 def runner(tmp_, ids):
@@ -130,20 +144,28 @@ def runner(tmp_, ids):
     exp_info = {strip(k): v for k, v in exp_info.items()}
     wrout = []
     allexps = NetworkCombiner()
+    allids = []
     for smpl in dir_:
         base = os.path.basename(os.path.normpath(smpl))
         if not exp_info.get(base, None):
             continue
         print(base, exp_info[base])
         pred_out = os.path.join(smpl, "dnn.txt")
+        # raw_matrix = os.path.join(smpl, "transf_matrix.txt")
+        allids.extend(list(pd.read_csv(raw_matrix, sep="\t")['ID']))
         exp = TableConverter(
             name=exp_info[base],
             table=pred_out,
-            cond=pred_out,
+            cond=pred_out
         )
+        # create base network
         exp.convert_to_network()
-        exp.weight_adj_matrx(path=smpl)
+        # exp.weight_adj_matrx(path=smpl)
         allexps.add_exp(exp)
     allexps.create_dfs()
+    # combine all individual graphs
+    allexps.combine_graphs(allids)
+    # extract combined adjancency matrix for all samples
+    allexps.adj_matrix_multi()
     outname = os.path.join(tmp_, "combined.txt")
     allexps.multi_collapse(outname)

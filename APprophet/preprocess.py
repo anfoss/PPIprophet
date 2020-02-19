@@ -117,6 +117,7 @@ def zero_sequence(arr):
             return tmp + l
         idx += 1
 
+
 def gen_pairs(prot):
     """
     generate all possible pairs between proteins
@@ -164,7 +165,7 @@ def runner(infile):
         os.makedirs(base)
     # write transf matrix
     dest = os.path.join(base, "transf_matrix.txt")
-    pr_df.to_csv(dest, sep="\t", encoding="utf-8")
+    pr_df.to_csv(dest, sep="\t", encoding="utf-8", index_label='ID')
     ppi = gen_pairs(prot2)
     nm = os.path.join(base, "ppi.txt")
     io.wrout(ppi, nm, ["ID", "MB", "FT"])

@@ -27,7 +27,6 @@ class ParserHelper(argparse.ArgumentParser):
         sys.exit(2)
 
 
-# TODO check os
 def get_os():
     return platform.system()
 
@@ -88,8 +87,7 @@ def main():
     for infile in files:
         # validate.InputTester(infile, 'in').test_file()
         # tmp_folder = io.file2folder(infile, prefix=config['GLOBAL']['temp'])
-        preprocess.runner(infile)
-        assert False
+        # preprocess.runner(infile)
         pass
         # gen_feat.runner(tmp_folder)
     # assert False
