@@ -32,8 +32,13 @@ class ProteinProfile(object):
     def get_peaks(self):
         return self.peaks
 
-    def calc_peaks(self):
-        pks = list(st.peak_picking(self.inten)[0])
+    def calc_peaks(self, pick=False):
+        # we already splitted so we can use the max
+        pks = None
+        if pick:
+            pks = list(st.peak_picking(self.inten)[0])
+        else:
+            pks = self.inten.index(max(self.inten))
         # avoid breakage due to float
         self.peaks = [int(x) for x in pks]
 
@@ -363,9 +368,8 @@ def predict(base, modelname="./APprophet/APprophet_dnn.h5"):
     # now add the two proteins
     header = ["MB", "Prob"]
     df = pd.DataFrame(out, columns=header)
-    # split header
     df['ProtA'], df['ProtB'] = df['MB'].str.split('#', 1).str
-    df.drop('MB', inplace=True)
+    df.drop('MB', inplace=True, axis=1)
     df = df[['ProtA', 'ProtB', 'Prob']]
     outfile = os.path.join(base, "dnn.txt")
     df.to_csv(outfile, sep="\t", index=False)
@@ -378,19 +382,19 @@ def runner(base):
     generate all features from the mapped complexes file
     base = config[GLOBAL][TEMP]filename
     """
-    # cmplx_comb = os.path.join(base, "ppi.txt")
-    # print(os.path.dirname(os.path.realpath(__file__)))
-    # wr, pks = mp_cmplx(filename=cmplx_comb)
-    # feature_path = os.path.join(base, "mp_feat_norm.txt")
-    # feat_header = [
-    #     "ID",
-    #     "MB",
-    #     "COR",
-    #     "SHFT",
-    #     "DIF",
-    #     "W",
-    # ]
-    # io.wrout(wr, feature_path, feat_header)
-    # peaklist_path = os.path.join(base, "peak_list.txt")
-    # io.wrout(pks, peaklist_path, ["MB", "ID", "PKS", "SEL"])
+    cmplx_comb = os.path.join(base, "ppi.txt")
+    print(os.path.dirname(os.path.realpath(__file__)))
+    wr, pks = mp_cmplx(filename=cmplx_comb)
+    feature_path = os.path.join(base, "mp_feat_norm.txt")
+    feat_header = [
+        "ID",
+        "MB",
+        "COR",
+        "SHFT",
+        "DIF",
+        "W",
+    ]
+    io.wrout(wr, feature_path, feat_header)
+    peaklist_path = os.path.join(base, "peak_list.txt")
+    io.wrout(pks, peaklist_path, ["MB", "ID", "PKS", "SEL"])
     predict(base)

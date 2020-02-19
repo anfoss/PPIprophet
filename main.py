@@ -12,11 +12,11 @@ from functools import partial
 
 # modules
 from APprophet import io_ as io
-from APprophet import predict as predict
 from APprophet import exceptions as exceptions
 from APprophet import validate_input as validate
 from APprophet import generate_features as gen_feat
 from APprophet import preprocess as preprocess
+from APprophet import score_network as score_network
 
 
 class ParserHelper(argparse.ArgumentParser):
@@ -86,11 +86,15 @@ def main():
     files = [os.path.abspath(x) for x in files.keys()]
     for infile in files:
         # validate.InputTester(infile, 'in').test_file()
-        # preprocess.runner(infile)
         tmp_folder = io.file2folder(infile, prefix=config['GLOBAL']['temp'])
-        gen_feat.runner(tmp_folder)
-        assert False
-        predict.runner(tmp_folder)
+        preprocess.runner(infile)
+        # gen_feat.runner(tmp_folder)
+    assert False
+    score_network.runner(
+                        tmp_=config['GLOBAL']['temp'],
+                        ids=config['GLOBAL']['sid']
+                        )
+
 
 
 if __name__ == '__main__':

@@ -11,11 +11,11 @@ import APprophet.stats_ as st
 
 
 # standardize and center methods
-def center_arr(hoa, fr_nr="all", smooth=True, stretch=(True, 72)):
+def center_arr(hoa, fr_nr="all", smooth=False, stretch=(True, 72)):
     norm = {}
     for k in hoa:
         key = hoa[k]
-        # key = baseline_als(key)
+        key = baseline_als(key)
         if fr_nr != "all":
             key = key[0:(fr_nr)]
         # if less than 2 real values
@@ -32,7 +32,7 @@ def center_arr(hoa, fr_nr="all", smooth=True, stretch=(True, 72)):
     return norm
 
 
-def baseline_als(y, lam=10, p=0.1, niter=10):
+def baseline_als(y, lam=50, p=0.1, niter=10):
     """
     perform baseline correction
     https://stackoverflow.com/questions/29156532/python-baseline-correction-library
