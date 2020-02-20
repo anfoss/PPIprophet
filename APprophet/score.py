@@ -253,15 +253,17 @@ class NetworkCombiner(object):
         self.adj_matrx = all_adj.pop()
         for m1 in all_adj:
             self.adj_matrx = np.matmul(self.adj_matrx, m1)
+        # self.adj_matrx[self.adj_matrx < 0.5] = 0
         return self.adj_matrx
 
-    def multi_collapse(self, name):
+    def multi_collapse(self):
         self.combined = reduce(lambda x, y: pd.merge(x, y,
                                             on = ['ProtA', 'ProtB'],
                                             how='outer'),
                     self.dfs)
-        self.combined.fillna(0)
-        self.combined.to_csv(name, sep="\t", index=False)
+        self.combined.fillna(0, inplace=True)
+        return self.combined
+        # self.combined.to_csv(name, sep="\t", index=False)
 
     def get_ids(self):
         return self.ids
@@ -312,12 +314,14 @@ class TableConverter(object):
         return self.df
 
 
-def fully_connected(l, create_using=None):
+def fully_connected(l, w=10**-17):
+    # add small values as weight to get value in matrix multiplication
     G = nx.Graph()
-    [G.add_edge(u,q, weight=0) for u,q in itertools.combinations(l,2)]
+    [G.add_edge(u,q, weight=w) for u,q in itertools.combinations(l,2)]
     return G
 
 
+@io.timeit
 def runner(tmp_, ids):
     """
     read folder tmp in directory.
@@ -356,14 +360,23 @@ def runner(tmp_, ids):
     m_adj = allexps.adj_matrix_multi()
     ids = allexps.get_ids()
     G = nx.from_numpy_matrix(np.array(m_adj))
-    clf = DANMF()
+    print('Predicting complexes from network\n')
+    # test
+    clf = DANMF(
+                layers=[500, 100],
+                pre_iterations=50,
+                iterations=200,
+                seed=42,
+                lamb=0.01)
     clf.fit(G)
     ids = dict(zip(range(0, len(ids)), ids))
     outname = os.path.join(tmp_, "combined.txt")
-    allexps.multi_collapse(outname)
+    outfile = allexps.multi_collapse()
+    outfile.to_csv(outname, sep="\t", index=False)
     out = []
     for k,v in clf.get_memberships().items():
         out.append([k,ids[k], v])
+    print(len(set(list(clf.get_memberships().values()))))
     out = pd.DataFrame(out, columns=['IDX', 'Identifier', 'Community'])
     outname = os.path.join(tmp_, "communities.txt")
-    out.to_csv(outname, sep="\t")
+    out.to_csv(outname, sep="\t", index=False)
