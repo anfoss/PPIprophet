@@ -231,7 +231,7 @@ def runner(tmp_, ids):
     ids_d = dict(zip(range(0, len(ids)), ids))
     out = []
     for k,v in clf.get_memberships().items():
-        out.append([k,ids_d[k], v])
+        out.append([k,ids_d.get(k, None), v])
     print(len(set(list(clf.get_memberships().values()))))
 
     # communities
