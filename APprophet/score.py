@@ -48,7 +48,7 @@ class NetworkCombiner(object):
         """
         all_adj = []
         for G in self.networks:
-            nd = map(str, G.nodes())
+            nd = list(map(str, G.nodes()))
             adj = nx.adjacency_matrix(
                                     G,
                                     nodelist=sorted(nd),
@@ -248,6 +248,5 @@ def runner(tmp_, ids):
     m_adj = pd.DataFrame(m_adj, index=ids)
     m_adj.columns = ids
     m_adj.to_csv('adj_matrix_combined.txt', sep="\t")
-    heatmap(m_adj)
-    gn2comm = {ids_d[k]:v for k,v in clf.get_memberships().items()}
+    gn2comm = {ids_d.get(k, None):v for k,v in clf.get_memberships().items()}
     plot_network(m_adj, outfile, gn2comm)
