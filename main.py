@@ -15,6 +15,7 @@ from APprophet import io_ as io
 from APprophet import exceptions as exceptions
 from APprophet import validate_input as validate
 from APprophet import generate_features as gen_feat
+from APprophet import predict as predict
 from APprophet import preprocess as preprocess
 from APprophet import score as score
 
@@ -85,11 +86,11 @@ def main():
     files = [os.path.abspath(x) for x in files.keys()]
     for infile in files:
         # validate.InputTester(infile, 'in').test_file()
+        pass
         # tmp_folder = io.file2folder(infile, prefix=config['GLOBAL']['temp'])
         # preprocess.runner(infile)
-        pass
         # gen_feat.runner(tmp_folder)
-    # assert False
+        # predict.runner(tmp_folder)
     score.runner(
                 tmp_=config['GLOBAL']['temp'],
                 ids=config['GLOBAL']['sid']

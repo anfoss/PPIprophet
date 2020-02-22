@@ -5,9 +5,7 @@ import numpy as np
 from scipy import stats
 import pandas as pd
 from scipy.ndimage import uniform_filter
-import tensorflow as tf
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.models import model_from_json
+import multiprocessing as mp
 
 
 import APprophet.io_ as io
@@ -32,7 +30,7 @@ class ProteinProfile(object):
     def get_peaks(self):
         return self.peaks
 
-    def calc_peaks(self, pick=False):
+    def calc_peaks(self, pick=True):
         # we already splitted so we can use the max
         pks = None
         if pick:
@@ -56,11 +54,12 @@ class ComplexProfile(object):
         # members needs to be reformat to have a 2d matrix
         self.members = []
         self.pks = {}
-        self.width = {}
-        self.shifts = []
+        self.width = None
+        self.shifts = None
         self.cor = []
         self.diff = []
-        self.pks_ali = []
+        self.pks_ali = {}
+        self.yhat_probs = None
 
     def add_member(self, prot):
         self.members.append(prot)
@@ -85,12 +84,23 @@ class ComplexProfile(object):
         for k in self.pks.keys():
             yield "{}\t{}\t{}".format(k, self.get_name(), self.pks[k])
 
-    def format_ids(self):
+    def format_ids(self, deli="#"):
         """
         create a complex identifier by contatenating all the acc
         """
         cmplx_members = self.get_members()
-        return "#".join(cmplx_members)
+        return deli.join(cmplx_members)
+
+    def test(self):
+        # cor = np.corrcoef(
+        #                  self.members[0].get_inte(),
+        #                  self.members[1].get_inte()
+        #                  )
+        # # if low correlation no need to compute anything
+        # if cor[0][-1] <= 0.0:
+        #     # print(self.get_members(), str(cor[0][-1]))
+        #     return False
+        return True
 
     def calc_corr(self, pairs, W=10):
         """
@@ -123,34 +133,26 @@ class ComplexProfile(object):
         # add np.nan to reach 72
         self.cor = np.hstack((D / np.sqrt(ssAs * ssBs), np.zeros(9) + np.nan))
 
-    def align_peaks(self, skip=5):
+    def align_peaks(self, skip=100):
         """
         align all protein peaks
         """
         # now we need to create the align file for each protein in this cmplx
         pk = [prot.get_peaks() for prot in self.members]
-        idx_missing = [i for i, j in enumerate(pk) if not j]
-        nan_members = [self.get_members()[i] for i in idx_missing]
-        pres = [x for x in pk if x]
-        mb_pres = [x for x in self.get_members() if x not in nan_members]
-        if nan_members == self.get_members():
-            self.pks_ali = dict(zip(nan_members, [np.nan] * len(nan_members)))
+        # check that both proteins have a peak
+        if not all([True if x else False for x in pk]):
             return False
         else:
-            ali_pk = alligner(pres)
+            ali_pk = alligner(pk)
             # mean only 2 peaks
-            md = round(st.mean(ali_pk))
-            if md >= skip:
-                return False
-            # missing values gets the median of aligned peaks
-            self.pks_ali = dict(zip(nan_members, [md] * len(nan_members)))
-            self.pks_ali.update(dict(zip(mb_pres, ali_pk)))
+            prot = [x for x in self.get_members()]
+            self.pks_ali = dict(zip(prot, ali_pk))
             for k in self.members:
                 if k.get_peaks():
-                    _ = "#".join(map(str, k.get_peaks()))
+                    row = "#".join(map(str, k.get_peaks()))
                 else:
-                    _ = str(self.pks_ali[k.get_acc()])
-                pks = _ + "\t" + str(self.pks_ali[k.get_acc()])
+                    row = str(self.pks_ali[k.get_acc()])
+                pks = row + "\t" + str(self.pks_ali[k.get_acc()])
                 self.pks[k.get_acc()] = pks
             return True
 
@@ -169,16 +171,16 @@ class ComplexProfile(object):
         self.diff = abs(p1.get_inte() - p2.get_inte())
 
     def calc_width(self):
-        q = 2
+        # q = 3
         # width = []
         # for prot in self.members:
         #     peak = int(self.pks_ali[prot.get_acc()])
         #     prot_peak = prot.get_inte()[(peak - q) : (peak + q)]
+        #     prot_peak = prot.get_inte()
         #     prot_fwhm = st.fwhm(list(prot_peak))
         #     width.append(prot_fwhm)
-        # print(width)
-        self.width = 4
-        # to change!
+        # self.width = np.mean(width)
+        self.width=4
 
     def create_row(self):
         """
@@ -196,7 +198,6 @@ class ComplexProfile(object):
             dif_conc,
             str(self.width),
         ]
-        row = [x.replace("\n", "") for x in row]
         return "\t".join([str(x) for x in row])
 
 
@@ -353,28 +354,8 @@ def mp_cmplx(filename):
             if feat_row and peaks:
                 feat_file.append(feat_row)
                 [peaks_file.append(x) for x in list(peaks)]
+            del cmplx
     return feat_file, peaks_file
-
-
-def predict(base, modelname="./APprophet/APprophet_dnn.h5"):
-    """
-    get model file and run prediction
-    """
-    infile = os.path.join(base, "mp_feat_norm.txt")
-    X, memo = io.prepare_feat(infile)
-    X = X.astype(np.float64)
-    model = tf.keras.models.load_model(modelname)
-    yhat_probs = model.predict(X, verbose=0)
-    out = np.concatenate((memo, yhat_probs.reshape(-1, 1)), axis=1)
-    # now add the two proteins
-    header = ["MB", "Prob"]
-    df = pd.DataFrame(out, columns=header)
-    df['ProtA'], df['ProtB'] = df['MB'].str.split('#', 1).str
-    df.drop('MB', inplace=True, axis=1)
-    df = df[['ProtA', 'ProtB', 'Prob']]
-    outfile = os.path.join(base, "dnn.txt")
-    df.to_csv(outfile, sep="\t", index=False)
-    return True
 
 
 @io.timeit
@@ -388,14 +369,13 @@ def runner(base):
     wr, pks = mp_cmplx(filename=cmplx_comb)
     feature_path = os.path.join(base, "mp_feat_norm.txt")
     feat_header = [
-        "ID",
-        "MB",
-        "COR",
-        "SHFT",
-        "DIF",
-        "W",
+        'ID',
+        'MB',
+        'COR',
+        'SHFT',
+        'DIF',
+        'W',
     ]
     io.wrout(wr, feature_path, feat_header)
     peaklist_path = os.path.join(base, "peak_list.txt")
     io.wrout(pks, peaklist_path, ["MB", "ID", "PKS", "SEL"])
-    predict(base)

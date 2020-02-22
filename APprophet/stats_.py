@@ -94,7 +94,7 @@ def gauss_filter(arr, sigma=1, order=0):
     return filt
 
 
-def peak_picking(arr, height=0.1, width=1):
+def peak_picking(arr, height=0.1, width=2):
     """
     return indexes of peaks from array giving a peak of minimum height var
     """

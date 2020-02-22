@@ -416,10 +416,10 @@ def prepare_feat(infile, thresh=1, missing=["nan", "na", "", None, "n", "-"]):
     cor = split_to_df(feat, "COR")
     dif = split_to_df(feat, "DIF")
     feat2 = feat[["SHFT", "W"]]
-    feat2 = feat2.apply(pd.to_numeric)
     feat_num = pd.concat([feat2, cor, dif], axis=1)
     feat_num.replace(to_replace=missing, value=np.nan, inplace=True)
     # remove nan
+    feat_num = feat_num.astype(np.float64)
     mask = feat_num.isnull().mean(axis=1) <= thresh
     feat_num = feat_num[mask].fillna(0)
     return feat_num.values, memos[mask].values

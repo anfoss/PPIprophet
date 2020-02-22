@@ -3,15 +3,18 @@
 import sys
 import os
 import re
+import itertools
 
 import numpy as np
+from sklearn.mixture import GaussianMixture
+
 
 import APprophet.io_ as io
 import APprophet.stats_ as st
 
 
 # standardize and center methods
-def center_arr(hoa, fr_nr="all", smooth=False, stretch=(True, 72)):
+def center_arr(hoa, fr_nr="all", smooth=True, stretch=(True, 72)):
     norm = {}
     for k in hoa:
         key = hoa[k]
@@ -19,7 +22,6 @@ def center_arr(hoa, fr_nr="all", smooth=False, stretch=(True, 72)):
         if len([x for x in key if x > 0]) < 2:
             continue
         key = st.impute_namean(key)
-        key = baseline_als(key)
         if fr_nr != "all":
             key = key[0:(fr_nr)]
         if smooth:
@@ -27,12 +29,13 @@ def center_arr(hoa, fr_nr="all", smooth=False, stretch=(True, 72)):
         if stretch[0]:
             # input original length wanted length
             key = st.resample(key, len(key), output_fr=stretch[1])
-        # key = st.resize(key)
+        key = baseline_als(key)
+        key = st.resize(key)
         norm[k] = list(key)
     return norm
 
 
-def baseline_als(y, lam=10, p=0.5, niter=100, pl=True):
+def baseline_als(y, lam=10, p=0.5, niter=100, pl=False, fr=75):
     """
     perform baseline correction
     https://stackoverflow.com/questions/29156532/python-baseline-correction-library
@@ -58,8 +61,8 @@ def baseline_als(y, lam=10, p=0.5, niter=100, pl=True):
     if pl:
         fig = plt.figure()
         ax = plt.subplot(111)
-        ax.plot(list(range(0,75)), y, label='not rescaled')
-        ax.plot(list(range(0,75)), z, label='rescaled')
+        ax.plot(list(range(0, fr)), y, label='not rescaled')
+        ax.plot(list(range(0, fr)), z, label='rescaled')
         plt.legend()
         plt.show()
         plt.close()
@@ -72,7 +75,7 @@ def split_peaks(prot_arr, pr, skp=0):
     returns
     'right_bases': array([32]), 'left_bases': array([7])
     """
-    peaks = list(st.peak_picking(prot_arr))
+    peaks = list(st.peak_picking(prot_arr, height=0.2, width=3))
     left_bases = peaks[1]["left_bases"]
     right_bases = peaks[1]["right_bases"]
     fr_peak = peaks[0]
@@ -82,10 +85,9 @@ def split_peaks(prot_arr, pr, skp=0):
         ret[pr] = prot_arr
         return ret
     for idx, pk in enumerate(fr_peak):
-        if pk < 6 and pk > 69:
-            continue
         nm = "_".join([pr, str(idx)])
         clean = fill_zeroes(prot_arr, pk, left_bases[idx], right_bases[idx])
+        clean = list(baseline_als(np.array(clean), fr=len(clean)))
         ret[nm] = clean
     return ret
 
@@ -123,41 +125,37 @@ def gen_pairs(prot):
     generate all possible pairs between proteins
     remove self dupl i.e between same protein but different apex
     """
-    nms = list(prot.keys())
     count = 0
     index = 1
-    pairs = []
-    for element1 in nms:
-        for element2 in nms[index:]:
-            if element1[:-1] in element2:
-                continue
-            else:
-                pairs.append((element1, element2))
-        index += 1
+    pairs = list(itertools.combinations(list(prot.keys()), 2))
     ppi = []
     idx = 0
     for p in pairs:
-        l1 = ','.join(map(str, prot[p[0]]))
-        l2 = ','.join(map(str, prot[p[1]]))
-        row = '#'.join([l1, l2])
-        nm = 'ppi_' + str(idx)
-        ppi.append('\t'.join([nm, '#'.join(p), row]))
-        idx +=1
+        if np.corrcoef(prot[p[0]], prot[p[1]])[0][-1] > 0:
+            l1 = ','.join(map(str, prot[p[0]]))
+            l2 = ','.join(map(str, prot[p[1]]))
+            row = '#'.join([l1, l2])
+            nm = 'ppi_' + str(idx)
+            ppi.append('\t'.join([nm, '#'.join(p), row]))
+            idx +=1
     return ppi
 
 
-@io.timeit
-def runner(infile):
+# @io.timeit
+def runner(infile, split=False):
     prot = io.read_txt(infile)
     print("preprocessing " + infile)
     # write it for differential stretch it to assert same length
     prot = center_arr(prot)
     prot2 = {}
-    for pr in prot:
-        pks = split_peaks(prot[pr], pr)
-        if pks:
-            for k in pks:
-                prot2[k] = pks[k]
+    if split:
+        for pr in prot:
+            pks = split_peaks(prot[pr], pr)
+            if pks:
+                for k in pks:
+                    prot2[k] = pks[k]
+    else:
+        prot2 = prot
     pr_df = io.create_df(prot2)
     base = io.file2folder(infile, prefix="./tmp/")
     # create tmp folder and subfolder with name

@@ -1,27 +1,26 @@
 # !/usr/bin/env python3
 
-
 import os
-import pandas as pd
+
 import numpy as np
+import pandas as pd
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.models import model_from_json
+
+from APprophet import io_ as io
 
 
 
-import APprophet.io_ as io
-
-def runner(base, model="./APprophet/APprophet_dnn.h5"):
-    """
-    get model file and run prediction
-    """
-    infile = os.path.join(base, "mp_feat_norm.txt")
-    X, memo = io.prepare_feat(infile)
+def runner(base, modelname="./APprophet/APprophet_dnn.h5"):
+    infile = os.path.join(base, 'mp_feat_norm.txt')
     model = tf.keras.models.load_model(modelname)
-    yhat_probs = model.predict(X_test, verbose=0)
-    pos = np.array(["Yes" if x == 1 else "No" for x in model.predict_cl(X)])
-    out = np.concatenate((memo, prob, pos.reshape(-1, 1)), axis=1)
-    header = ["ID", "NEG", "POS", "IS_CMPLX"]
-    df = pd.DataFrame(out, columns=header)
-    df = df[["ID", "POS", "NEG", "IS_CMPLX"]]
-    outfile = os.path.join(base, "dnn.txt")
-    df.to_csv(outfile, sep="\t", index=False)
-    return True
+    X, memo = io.prepare_feat(infile)
+    yhat_probs = model.predict(X, verbose=0)
+    df = pd.DataFrame(np.column_stack([memo, yhat_probs]),
+                               columns=['protS', 'Prob'])
+    df['ProtA'], df['ProtB'] = df['protS'].str.split('#', 1).str
+    pred_path = os.path.join(base, "dnn.txt")
+    df.drop('protS', inplace=True, axis=1)
+    df = df[['ProtA', 'ProtB', 'Prob']]
+    df.to_csv(pred_path, sep="\t", index=False)

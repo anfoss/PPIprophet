@@ -6,6 +6,12 @@ __pycache__/
 # C extensions
 *.so
 
+# R history
+*.Rhistory
+
+# Conf file
+ProphetConfig.conf
+
 # Distribution / packaging
 .Python
 build/
@@ -131,4 +137,9 @@ dmypy.json
 
 # folder and files to avoid
 Input/
+tmp/
 sample_ids.txt
+sample_ids_dummy.txt
+adj_matrix_combined.txt
+ppi_network.GraphML
+todo.txt
