@@ -4,6 +4,7 @@ import sys
 import os
 import itertools
 from functools import reduce
+import matplotlib.pyplot as plt
 
 
 import pandas as pd
@@ -85,25 +86,25 @@ class TableConverter(object):
         super(TableConverter, self).__init__()
         self.name = name
         self.table = table
-        self.df = None
+        self.df = pd.read_csv(table, sep="\t")
         self.cond = cond
         self.G = nx.Graph()
         self.adj = None
+        self.fdr = None
 
     def clean_name(self, col):
         self.df[col] = self.df[col].str.split('_').str[0]
 
     def convert_to_network(self):
-        self.df = pd.read_csv(self.table, sep="\t")
         self.clean_name('ProtA')
         self.clean_name('ProtB')
         for row in self.df.itertuples():
             self.G.add_edge(row[1], row[2], weight=row[3])
         return True
 
-    def fill_graph(self, ids):
+    def fill_graph(self, ids, w=10**-17):
         G2 = fully_connected(ids)
-        [self.G.add_edge(*p, weight=0) for p in G2.edges() if not self.G.has_edge(p[0], p[1])]
+        [self.G.add_edge(*p, weight=w) for p in G2.edges() if not self.G.has_edge(p[0], p[1])]
         return self.G
 
     def weight_adj_matrx(self, path, write=False):
@@ -117,16 +118,91 @@ class TableConverter(object):
             np.savetxt(nm, self.adj, delimiter="\t")
         return True
 
+    def modify_df(self, fdr_thresh):
+        """
+        substitute 0 to everything below fdr threshold
+        """
+        self.df['Prob'].values[self.df['Prob'] <= fdr_thresh] = 0
+
     def get_adj_matrx(self):
         return self.adj
 
     def get_df(self):
         return self.df
 
+    def calc_fdr(self, path, bait='UXT', target_fdr=0.3):
+        """
+        get shell level of interaction of bait and then calc local fdr
+        for every pred level
+        """
+        bait_int = self.df[(self.df['ProtA']==bait) | (self.df['ProtB']==bait)]
+        bait_int = bait_int[bait_int['Prob']>=0.5]
+        allz = list(bait_int['ProtA'])
+        allz.extend(list(bait_int['ProtB']))
+        allz = set(allz)
+
+        pos = [bait_int]
+        for p in allz:
+            tmp = self.df[(self.df['ProtA']==p) | (self.df['ProtB']==p)]
+            pos.append(tmp[tmp['Prob'] >=0.5])
+        pos = pd.concat(pos)
+        neg = pd.concat([self.df,pos]).drop_duplicates(keep=False)
+        pos, neg = pos['Prob'].values, neg['Prob'].values
+        scores = np.concatenate((pos, neg))
+        scores = np.sort(scores)
+        # initialize empty score array
+        fdr = np.zeros((scores.shape[0],),
+                       dtype=[('target', 'f4'), ('decoy', 'f4'), ('fdr', 'f4'), ('prob', 'f4')])
+        for i in range(0, scores.shape[0]):
+            s = scores[i]
+            nt = np.where(pos >= s)[0].shape[0] / pos.shape[0]
+            nd = np.where(neg >= s)[0].shape[0] / neg.shape[0]
+            if nt == 0 or (nd / nt) > 1.0:
+                fdr[i, ] = (nt, nd, 1.0, s)
+            else:
+                fdr[i, ] = (nt, nd, nd / nt, s)
+        plot_fdr(pos, neg, fdr, path)
+        fdr_df = pd.DataFrame(fdr, columns=['target', 'decoy', 'fdr', 'prob'])
+        fdr_df.to_csv(os.path.join(path, 'fdr.txt'), index=False, sep="\t")
+        fdr_thresh = fdr_df[fdr_df['fdr'] <= target_fdr]['prob'].values[0]
+        self.modify_df(fdr_thresh)
+
+
+def plot_fdr(target_dist, decoy_dist, fdr, path):
+    plt.figure(figsize=(6, 6))
+    plt.subplot(2, 1, 1)
+    binNum = 100.0
+    dist = np.unique(np.concatenate((target_dist, decoy_dist)))
+    binwidth = (max(dist) - min(dist)) / binNum
+
+    plt.hist(target_dist, bins=np.arange(min(dist), max(dist) + binwidth, binwidth),
+             color='r', edgecolor='r', alpha=0.3, label='Target')
+    plt.hist(decoy_dist, bins=np.arange(min(dist), max(dist) + binwidth, binwidth),
+             color='b', edgecolor='b', alpha=0.3, label='Decoy')
+    # plt.xlabel('DNN probability')
+    plt.ylabel('Frequency')
+    plt.legend()
+
+    plt.subplot(2, 1, 2)
+    plt.plot(fdr['prob'], fdr['target'], 'r', label='P[Target>x]')
+    plt.plot(fdr['prob'], fdr['decoy'], 'b--', label='P[Decoy>x]')
+    plt.plot(fdr['prob'], fdr['fdr'], 'k', label='FDR')
+    plt.xlabel('DNN probability')
+    plt.legend()
+
+    # plt.subplot(3, 1, 3)
+    # plt.plot(fdr['decoy'], fdr['target'], 'k')
+    # plt.ylabel('True positive rate')
+    # plt.xlabel('False positive rate')
+
+    plt.tight_layout()
+    outfile = os.path.join(path, 'fdr.pdf')
+    plt.savefig(outfile, dpi=800, bbox_inches='tight')
+    return True
 
 def fully_connected(l, w=10**-17):
     G = nx.Graph()
-    [G.add_edge(u,q, weight=0) for u,q in itertools.combinations(l,2)]
+    [G.add_edge(u,q, weight=w) for u,q in itertools.combinations(l,2)]
     return G
 
 
@@ -209,7 +285,8 @@ def runner(tmp_, ids):
             table=pred_out,
             cond=pred_out
         )
-        # create base network
+        exp.convert_to_network()
+        exp.calc_fdr(smpl)
         exp.convert_to_network()
         allexps.add_exp(exp)
     allexps.create_dfs()
@@ -219,13 +296,6 @@ def runner(tmp_, ids):
     G = nx.from_numpy_matrix(np.array(m_adj))
     print('Predicting complexes from network\n')
     # test
-    # clf = danmf.DANMF(
-    #                 layers=[32, 8],
-    #                 pre_iterations=100,
-    #                 iterations=100,
-    #                 seed=42,
-    #                 lamb=0.01
-    #                 )
     clf = edmot.EdMot()
     clf.fit(G)
     ids_d = dict(zip(range(0, len(ids)), ids))
