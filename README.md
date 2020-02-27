@@ -37,7 +37,7 @@ This will get you a working copy of APprophet into a folder called APprophet
 
 ## Usage
 
-For usage of PCprophet refers to the [APprophet_instructions.md](https://github.com/fossatiA/PCprophet/blob/master/PCprophet_instructions.md)
+For usage of APprophet refers to the [APprophet_instructions.md](https://github.com/fossatiA/PCprophet/blob/master/PCprophet_instructions.md)
 
 
 ## Contributing

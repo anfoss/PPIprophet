@@ -54,6 +54,13 @@ def create_config():
         action='store',
     )
     parser.add_argument(
+        '-out',
+        help='output folder name',
+        dest='out',
+        default='Output',
+        action='store',
+    )
+    parser.add_argument(
         '-fdr',
         help='false discovery rate for novel complexes',
         dest='fdr',
@@ -69,6 +76,7 @@ def create_config():
         'db': args.database,
         'sid': args.sample_ids,
         'temp': r'./tmp',
+        'out': args.out
     }
     config['POSTPROCESS'] = {'fdr': args.fdr}
 
@@ -86,15 +94,16 @@ def main():
     files = [os.path.abspath(x) for x in files.keys()]
     for infile in files:
         # validate.InputTester(infile, 'in').test_file()
-        pass
-        # tmp_folder = io.file2folder(infile, prefix=config['GLOBAL']['temp'])
-        # preprocess.runner(infile)
+        tmp_folder = io.file2folder(infile, prefix=config['GLOBAL']['temp'])
+        # preprocess.runner(infile)
         # gen_feat.runner(tmp_folder)
         # predict.runner(tmp_folder)
-    score.runner(
+    combined.runner(
                 tmp_=config['GLOBAL']['temp'],
-                ids=config['GLOBAL']['sid']
+                ids=config['GLOBAL']['sid'],
+                outf=config['GLOBAL']['out']
                 )
+    score.runner(tmp_=config['GLOBAL']['out'])
 
 
 

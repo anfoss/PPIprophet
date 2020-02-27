@@ -14,7 +14,7 @@ import APprophet.stats_ as st
 
 
 # standardize and center methods
-def center_arr(hoa, fr_nr="all", smooth=True, stretch=(True, 72)):
+def center_arr(hoa, fr_nr="all", smooth=False, stretch=(True, 72)):
     norm = {}
     for k in hoa:
         key = hoa[k]
@@ -35,10 +35,8 @@ def center_arr(hoa, fr_nr="all", smooth=True, stretch=(True, 72)):
     return norm
 
 
-def baseline_als(y, lam=10, p=0.5, niter=100, pl=False, fr=75):
+def als(y, lam=10, p=0.5, niter=100, pl=False, fr=75):
     """
-    perform baseline correction
-    https://stackoverflow.com/questions/29156532/python-baseline-correction-library
     p for asymmetry and λ for smoothness.
     generally 0.001 ≤ p ≤ 0.1
     10^2 ≤ λ ≤ 10^9
@@ -141,7 +139,22 @@ def gen_pairs(prot):
     return ppi
 
 
-# @io.timeit
+def impute_namean(ls):
+    """
+    impute 0s in list with value in between if neighbours are values
+    assumption is if data is gaussian mean of sequential points is best
+    """
+    idx = [i for i, j in enumerate(ls) if j == 0]
+    for zr in idx:
+        if zr == 0 or zr == (len(ls) - 1):
+            continue
+        elif ls[zr - 1] != 0 and ls[zr + 1] != 0:
+            ls[zr] = (ls[zr - 1] + ls[zr + 1]) / 2
+        else:
+            continue
+    return ls
+
+
 def runner(infile, split=False):
     prot = io.read_txt(infile)
     print("preprocessing " + infile)

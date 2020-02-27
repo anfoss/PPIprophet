@@ -16,7 +16,7 @@ class NNSED(Estimator):
         iterations (int): Number of training epochs. Default 10.
         seed (int): Random seed for weight initializations. Default 42.
     """
-    def __init__(self, dimensions=32, iterations=10, seed=42):
+    def __init__(self, dimensions=64, iterations=100, seed=42):
         self.dimensions = dimensions
         self.iterations = iterations
         self.seed = seed
@@ -32,7 +32,7 @@ class NNSED(Estimator):
             * **D_inverse** *(Scipy array)* - Diagonal inverse degree matrix.
         """
         index = np.arange(graph.number_of_nodes())
-        values = np.array([1.0/graph.degree[node] for node in range(graph.number_of_nodes())])
+        values = np.array([1.0/graph.degree[node] if graph.degree[node] else np.nan for node in range(graph.number_of_nodes())])
         shape = (graph.number_of_nodes(), graph.number_of_nodes())
         D_inverse = sparse.coo_matrix((values, (index, index)), shape=shape)
         return D_inverse
