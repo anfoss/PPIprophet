@@ -5,7 +5,7 @@ import os
 import itertools
 from functools import reduce
 import matplotlib.pyplot as plt
-
+import pickle
 
 import pandas as pd
 import numpy as np
@@ -56,11 +56,11 @@ class NetworkCombiner(object):
                                     )
             self.ids = sorted(nd)
             all_adj.append(adj.todense())
-        # now multiply
+        # now multiply each element for the others
         self.adj_matrx = all_adj.pop()
         for m1 in all_adj:
-            self.adj_matrx = np.matmul(self.adj_matrx, m1)
-        self.adj_matrx[self.adj_matrx < 0.5] = 0
+            self.adj_matrx = np.multiply(self.adj_matrx, m1)
+        # self.adj_matrx[self.adj_matrx < 0.5] = 0
         return self.adj_matrx
 
     def multi_collapse(self):
@@ -107,7 +107,7 @@ class TableConverter(object):
         [self.G.add_edge(*p, weight=w) for p in G2.edges() if not self.G.has_edge(p[0], p[1])]
         return self.G
 
-    def weight_adj_matrx(self, path, write=False):
+    def weight_adj_matrx(self, path, write=True):
         self.adj = nx.adjacency_matrix(
                                         self.G,
                                         nodelist=sorted(self.G.nodes()), weight='weight'
@@ -140,7 +140,7 @@ class TableConverter(object):
     def get_df(self):
         return self.df
 
-    def calc_fdr(self, path, bait='UXT', target_fdr=0.1):
+    def calc_fdr(self, path, bait='UXT', target_fdr=0.2):
         '''
         get shell level of interaction of bait and then calc local fdr
         for every pred level
@@ -171,13 +171,15 @@ class TableConverter(object):
                 fdr[i, ] = (nt, nd, 1.0, s)
             else:
                 fdr[i, ] = (nt, nd, nd / nt, s)
-        plot_fdr(pos, neg, fdr, path)
+        # plot_fdr(pos, neg, fdr, path)
         fdr_df = pd.DataFrame(fdr, columns=['target', 'decoy', 'fdr', 'prob'])
         fdr_df.to_csv(os.path.join(path, 'fdr.txt'), index=False, sep="\t")
         fdr_thresh = 0.5
         try:
+            # either first value smaller than target
             fdr_thresh = fdr_df[fdr_df['fdr'] <= target_fdr]['prob'].values[0]
         except IndexError as e:
+            # or first value bigger than target
             fdr_thresh = fdr_df[fdr_df['fdr'] >=target_fdr]['prob'].values[-1]
         print('Estimated prob threshold for {} is {}'.format(path, fdr_thresh))
         self.fdr = fdr_df
@@ -280,7 +282,6 @@ def plot_network(adj, df, community):
     )
 
 
-@io.timeit
 def runner(tmp_, ids, outf):
     '''
     read folder tmp in directory.
@@ -311,21 +312,24 @@ def runner(tmp_, ids, outf):
             cond=pred_out
         )
         exp.convert_to_network()
-        # exp.calc_fdr(smpl)
+        exp.weight_adj_matrx(smpl, write=True)
+        #exp.calc_fdr(smpl, target_fdr=0.15)
         # exp.convert_to_network()
         allexps.add_exp(exp)
     allexps.create_dfs()
     allexps.combine_graphs(allids)
     m_adj = allexps.adj_matrix_multi()
     ids = allexps.get_ids()
+    with open(os.path.join(tmp_, 'ids.pkl'), 'wb') as f:
+        pickle.dump(ids, f)
 
     # protA protB format
-    outname = os.path.join(outf, 'combined.txt')
+    outname = os.path.join(outf, 'adj_list.txt')
     outfile = allexps.multi_collapse()
-    outfile.to_csv(outname, sep="\t", index=True)
+    outfile.to_csv(os.path.join(outname), sep="\t", index=True)
 
     # adj matrix
-    m_adj = pd.DataFrame(m_adj, index=ids)
-    m_adj.columns = ids
-    m_adj.to_csv(os.path.join(outf, 'adj_matrix_combined.txt', sep="\t")
-    gn2comm = {ids_d.get(k, None):v for k,v in clf.get_memberships().items()}
+    np.savetxt(os.path.join(tmp_, 'adj_mult.csv'), m_adj, delimiter=',')
+    # m_adj = pd.DataFrame(m_adj, index=ids)
+    # m_adj.columns = ids
+    # m_adj.to_csv(os.path.join(outf, 'adj_matrix_combined.txt'), sep="\t")

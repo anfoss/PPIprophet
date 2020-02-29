@@ -18,6 +18,7 @@ from APprophet import generate_features as gen_feat
 from APprophet import predict as predict
 from APprophet import preprocess as preprocess
 from APprophet import score as score
+from APprophet import combine as combine
 
 
 class ParserHelper(argparse.ArgumentParser):
@@ -98,12 +99,15 @@ def main():
         # preprocess.runner(infile)
         # gen_feat.runner(tmp_folder)
         # predict.runner(tmp_folder)
-    combined.runner(
-                tmp_=config['GLOBAL']['temp'],
-                ids=config['GLOBAL']['sid'],
-                outf=config['GLOBAL']['out']
+    # combine.runner(
+    #             tmp_=config['GLOBAL']['temp'],
+    #             ids=config['GLOBAL']['sid'],
+    #             outf=config['GLOBAL']['out']
+    #             )
+    score.runner(
+                outf=config['GLOBAL']['out'],
+                tmp_=config['GLOBAL']['temp']
                 )
-    score.runner(tmp_=config['GLOBAL']['out'])
 
 
 
