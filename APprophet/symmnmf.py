@@ -33,7 +33,7 @@ class SymmNMF(Estimator):
             * **D_inverse** *(Scipy array)* - Diagonal inverse degree matrix.
         """
         index = np.arange(graph.number_of_nodes())
-        values = np.array([1.0/graph.degree[node] for node in range(graph.number_of_nodes())])
+        values = np.array([1.0/graph.degree[node] if graph.degree[node] else 0 for node in range(graph.number_of_nodes())])
         shape = (graph.number_of_nodes(), graph.number_of_nodes())
         D_inverse = sparse.coo_matrix((values, (index, index)), shape=shape)
         return D_inverse
@@ -85,7 +85,7 @@ class SymmNMF(Estimator):
     def _do_admm_update(self, A_hat):
         """
         Doing a single ADMM update with the adjacency matrix.
-        
+
         """
         H_covar = np.linalg.inv(self.H.T.dot(self.H) + self.rho*self.I)
         self.W = (A_hat.dot(A_hat.T.dot(self.H)) + self.rho*self.H - self.H_gamma).dot(H_covar)
