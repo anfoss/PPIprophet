@@ -59,8 +59,8 @@ class NetworkCombiner(object):
         # now multiply each element for the others
         self.adj_matrx = all_adj.pop()
         for m1 in all_adj:
-            self.adj_matrx = np.multiply(self.adj_matrx, m1)
-        # self.adj_matrx[self.adj_matrx < 0.5] = 0
+             self.adj_matrx = np.multiply(self.adj_matrx, m1)
+            # self.adj_matrx = np.add(self.adj_matrx, m1)
         return self.adj_matrx
 
     def multi_collapse(self):
@@ -313,8 +313,6 @@ def runner(tmp_, ids, outf):
         )
         exp.convert_to_network()
         exp.weight_adj_matrx(smpl, write=True)
-        #exp.calc_fdr(smpl, target_fdr=0.15)
-        # exp.convert_to_network()
         allexps.add_exp(exp)
     allexps.create_dfs()
     allexps.combine_graphs(allids)
