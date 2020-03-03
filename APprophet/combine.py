@@ -47,6 +47,7 @@ class NetworkCombiner(object):
         add sparse adj matrix to the adj_matrix container
         '''
         all_adj = []
+        n = 0
         for G in self.networks:
             nd = list(map(str, G.nodes()))
             adj = nx.adjacency_matrix(
@@ -56,12 +57,12 @@ class NetworkCombiner(object):
                                     )
             self.ids = sorted(nd)
             all_adj.append(adj.todense())
+            n +=1
         # now multiply each element for the others
         self.adj_matrx = all_adj.pop()
         for m1 in all_adj:
-             self.adj_matrx = np.multiply(self.adj_matrx, m1)
-            # self.adj_matrx = np.add(self.adj_matrx, m1)
-        return self.adj_matrx
+            self.adj_matrx = np.multiply(self.adj_matrx, m1)
+        return self.adj_matrx # / n
 
     def multi_collapse(self):
         self.combined = reduce(lambda x, y: pd.merge(x, y,
@@ -96,8 +97,8 @@ class TableConverter(object):
         self.df[col] = self.df[col].str.split('_').str[0]
 
     def convert_to_network(self):
-        self.clean_name('ProtA')
-        self.clean_name('ProtB')
+        # self.clean_name('ProtA')
+        # self.clean_name('ProtB')
         for row in self.df.itertuples():
             self.G.add_edge(row[1], row[2], weight=row[3])
         return True
@@ -108,9 +109,18 @@ class TableConverter(object):
         return self.G
 
     def weight_adj_matrx(self, path, write=True):
+        """
+        creates adjacency matrix from the combined graph of all exps
+        Args:
+            path = outfile path
+            write = wrout or not
+        Returns:
+            True for testing
+        """
         self.adj = nx.adjacency_matrix(
                                         self.G,
-                                        nodelist=sorted(self.G.nodes()), weight='weight'
+                                        nodelist=sorted(map(str, self.G.nodes())),
+                                        weight='weight'
                                         )
         self.adj = self.adj.todense()
         if write:
@@ -225,61 +235,11 @@ def plot_fdr(target_dist, decoy_dist, fdr, path):
     plt.savefig(outfile, dpi=800, bbox_inches='tight')
     return True
 
+
 def fully_connected(l, w=10**-17):
     G = nx.Graph()
     [G.add_edge(u,q, weight=w) for u,q in itertools.combinations(l,2)]
     return G
-
-
-def heatmap(adj):
-    import seaborn as sns
-    import matplotlib.pyplot as plt
-
-    adj = pd.DataFrame(adj)
-    mask = np.zeros_like(adj, dtype=np.bool)
-    mask[np.triu_indices_from(mask)] = True
-    f, ax = plt.subplots(figsize=(11, 9))
-    sns_plot = sns.clustermap(
-                              adj,
-                              vmax=1,
-                              cmap='YlGnBu',
-                              center=0.5,
-                              square=True,
-                              linewidths=.5,
-                              cbar_kws={'shrink': .5}
-                              )
-    sns_plot.savefig('adj_matrix.pdf', dpi=800)
-
-
-def plot_network(adj, df, community):
-    import igraph as ig
-
-    adj = pd.DataFrame(adj)
-    adj_ids = list(adj.index)
-    comm = max(set(list(community.values())))
-    cols = ig.ClusterColoringPalette(comm + 1)
-    clr = [cols.get(community[x]) for x in list(adj.index)]
-
-    g = ig.Graph.Adjacency((adj.values > 0).tolist())
-    g.to_undirected()
-    weights = adj.values[np.where(adj.values)]
-    g.vs['label'] = adj.index
-    g.es['weight'] = weights
-
-    # remove disconnected nodes
-    g.delete_vertices(g.vs.find(_degree=0))
-
-    ig.plot(
-        g,
-        'PPI_network.pdf',
-        layout='fr',
-        vertex_size=20,
-        vertex_color=clr,
-        edge_width=[x/3 for x in g.es['weight']],
-        labels=True,
-        vertex_frame_color=clr,
-        keep_aspect_ratio=False,
-    )
 
 
 def runner(tmp_, ids, outf):
@@ -302,7 +262,7 @@ def runner(tmp_, ids, outf):
         base = os.path.basename(os.path.normpath(smpl))
         if not exp_info.get(base, None):
             continue
-        # print(base, exp_info[base])
+        # print(base, exp_info[base])
         pred_out = os.path.join(smpl, 'dnn.txt')
         raw_matrix = os.path.join(smpl, 'transf_matrix.txt')
         allids.extend(list(pd.read_csv(raw_matrix, sep="\t")['ID']))

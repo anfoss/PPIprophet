@@ -4,7 +4,7 @@ from sklearn.decomposition import NMF
 from karateclub.estimator import Estimator
 
 class DANMF(Estimator):
-    r"""An implementation of `"DANMF" <https://smartyfh.com/Documents/18DANMF.pdf>`_
+    """An implementation of `"DANMF" <https://smartyfh.com/Documents/18DANMF.pdf>`_
     from the CIKM '18 paper "Deep Autoencoder-like Nonnegative Matrix Factorization for
     Community Detection". The procedure uses telescopic non-negative matrix factorization
     in order to learn a cluster membership distribution over nodes. The method can be
@@ -141,7 +141,7 @@ class DANMF(Estimator):
         self.A_sq = self.A.dot(self.A.T)
 
     def get_embedding(self):
-        r"""Getting the bottleneck layer embedding.
+        """Getting the bottleneck layer embedding.
 
         Return types:
             * **embedding** *(Numpy array)* - The bottleneck layer embedding of nodes.
@@ -151,7 +151,7 @@ class DANMF(Estimator):
         return embedding
 
     def get_memberships(self):
-        r"""Getting the cluster membership of nodes.
+        """Getting the cluster membership of nodes.
 
         Return types:
             * **memberships** *(dict)*: Node cluster memberships.
