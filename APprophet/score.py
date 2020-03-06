@@ -38,7 +38,7 @@ def vec_wd_score(arr, norm):
     pres = arr[arr>0].shape[0]
     npres = arr[arr==0].shape[0]
     if pres == 0:
-        return np.zeroes(arr.shape)
+        return np.zeros(arr.shape)
     ntot =pres+npres
     mu_ = np.sum(arr)/ntot
     sum_sq_err = np.sum((arr - mu_)**2) + ((mu_**2) * npres)
@@ -73,10 +73,10 @@ def calc_wd_matrix(m, iteration=1000, q=0.9, norm=False, plot=False):
     pdf_r =  m.flatten()
     # calc pdf
     pdf_r = pdf_r/ pdf_r.shape[0]
-    prob = pdf_r[pdf_r>0].shape[0] / pdf_r[pdf_r==0].shape[0]
+    # prob = pdf_r[pdf_r>0].shape[0] / pdf_r[pdf_r==0].shape[0]
     while i < iteration:
         # p_arr = np.random.negative_binomial(n=1, p=0.01, size=m.shape[0])
-        p_arr = np.random.negative_binomial(n=1, p=prob, size=m.shape[0])
+        p_arr = np.random.negative_binomial(n=1, p=1, size=m.shape[0])
         rand_dist.append(vec_wd_score(p_arr, norm).flatten())
         print('iteration {} of {}'.format(i, iteration))
         i+=1
@@ -88,8 +88,8 @@ def calc_wd_matrix(m, iteration=1000, q=0.9, norm=False, plot=False):
         cutoff = np.quantile(p_rnd, q)
         fdr = calc_fdr(pdf_r, p_rnd.flatten())
         plot_fdr(pdf_r, p_rnd, cutoff, fdr, 'test_distr.pdf')
-    wd[wd < (cutoff * pdf_r.shape[0])] = 0
-    cutoff *= pdf_r.shape[0]
+    wd[wd < (cutoff * p_rnd.flatten().shape[0])] = 0
+    cutoff *= p_rnd.flatten().shape[0]
     print(cutoff)
     return wd
 
@@ -261,7 +261,7 @@ def runner(tmp_, outf, plots=True):
     # print('calculating wd score\n')
     m, ids = preprocess_matrix(m, ids)
     # calc wd score per matrix
-    wd = calc_wd_matrix(m, iteration=1000, q=0.90, plot=True)
+    wd = calc_wd_matrix(m, iteration=1000, q=0.99, plot=True)
     wd_ls = to_adj_lst(wd)
     df = pd.DataFrame(wd_ls)
     ids_d = dict(zip(range(0, len(ids)), ids))
