@@ -29,7 +29,7 @@ def center_arr(hoa, fr_nr="all", smooth=False, stretch=(True, 72)):
         if stretch[0]:
             # input original length wanted length
             key = st.resample(key, len(key), output_fr=stretch[1])
-        key = baseline_als(key)
+        # key = als(key)
         key = st.resize(key)
         norm[k] = list(key)
     return norm
@@ -73,7 +73,7 @@ def split_peaks(prot_arr, pr, skp=0):
     returns
     'right_bases': array([32]), 'left_bases': array([7])
     """
-    peaks = list(st.peak_picking(prot_arr, height=0.2, width=3))
+    peaks = list(st.peak_picking(prot_arr, height=0.1, width=3))
     left_bases = peaks[1]["left_bases"]
     right_bases = peaks[1]["right_bases"]
     fr_peak = peaks[0]
@@ -85,7 +85,7 @@ def split_peaks(prot_arr, pr, skp=0):
     for idx, pk in enumerate(fr_peak):
         nm = "_".join([pr, str(idx)])
         clean = fill_zeroes(prot_arr, pk, left_bases[idx], right_bases[idx])
-        clean = list(baseline_als(np.array(clean), fr=len(clean)))
+        clean = list(als(np.array(clean), fr=len(clean)))
         ret[nm] = clean
     return ret
 

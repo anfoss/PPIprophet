@@ -98,7 +98,12 @@ def peak_picking(arr, height=0.1, width=2):
     """
     return indexes of peaks from array giving a peak of minimum height var
     """
-    peaks = signal_processing.find_peaks(arr, height=height, width=width)
+    peaks = signal_processing.find_peaks(
+                                        arr,
+                                        height=height,
+                                        width=width,
+                                        prominence=0.10
+                                        )
     return peaks
 
 

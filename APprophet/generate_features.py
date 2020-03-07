@@ -358,7 +358,6 @@ def mp_cmplx(filename):
     return feat_file, peaks_file
 
 
-@io.timeit
 def runner(base):
     """
     generate all features from the mapped complexes file

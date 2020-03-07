@@ -10,7 +10,7 @@ import numpy as np
 import networkx as nx
 
 from APprophet import io_ as io
-from APprophet import danmf, edmot, ego_splitter, symmnmf, mcl
+from APprophet import danmf, mcl
 
 
 def normalize_wd(wd_arr, norm_=0.98):
@@ -108,7 +108,6 @@ def calc_wd_matrix(m, iteration=1000, q=0.9, norm=False, plot=False):
         i+=1
     rand_dist = np.array(rand_dist).reshape(-1,1)
     cutoff = np.quantile(rand_dist[rand_dist > 0], q)
-    # print(cutoff)
     if plot:
         plot_distr(wd, rand_dist, cutoff, 'test_distr.pdf')
     wd[wd < cutoff] = 0
@@ -185,8 +184,59 @@ def to_adj_lst(adj_m):
     return final
 
 
+def heatmap(adj):
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+
+    adj = pd.DataFrame(adj)
+    mask = np.zeros_like(adj, dtype=np.bool)
+    mask[np.triu_indices_from(mask)] = True
+    f, ax = plt.subplots(figsize=(11, 9))
+    sns_plot = sns.clustermap(
+                              adj,
+                              vmax=1,
+                              cmap='YlGnBu',
+                              center=0.5,
+                              square=True,
+                              linewidths=.5,
+                              cbar_kws={'shrink': .5}
+                              )
+    sns_plot.savefig('adj_matrix.pdf', dpi=800)
+
+
+def plot_network(adj, df, community):
+    import igraph as ig
+
+    adj = pd.DataFrame(adj)
+    adj_ids = list(adj.index)
+    comm = max(set(list(community.values())))
+    cols = ig.ClusterColoringPalette(comm + 1)
+    clr = [cols.get(community[x]) for x in list(adj.index)]
+
+    g = ig.Graph.Adjacency((adj.values > 0).tolist())
+    g.to_undirected()
+    weights = adj.values[np.where(adj.values)]
+    g.vs['label'] = adj.index
+    g.es['weight'] = weights
+
+    # remove disconnected nodes
+    g.delete_vertices(g.vs.find(_degree=0))
+
+    ig.plot(
+        g,
+        'PPI_network.pdf',
+        layout='fr',
+        vertex_size=20,
+        vertex_color=clr,
+        edge_width=[x/3 for x in g.es['weight']],
+        labels=True,
+        vertex_frame_color=clr,
+        keep_aspect_ratio=False,
+    )
+
+
 # @io.timeit
-def runner(tmp_, outf):
+def runner(tmp_, outf, plots=True):
     """
     read folder tmp_ in directory.
     then loop for each file and create a combined file which contains all files
@@ -198,7 +248,7 @@ def runner(tmp_, outf):
     print('calculating wd score\n')
     m, ids = preprocess_matrix(m, ids)
     # calc wd score per matrix
-    wd = calc_wd_matrix(m, iteration=1, q=0.8, plot=False)
+    wd = calc_wd_matrix(m, iteration=20, q=0.25, plot=True)
     wd_ls = to_adj_lst(wd)
     df = pd.DataFrame(wd_ls)
     ids_d = dict(zip(range(0, len(ids)), ids))
@@ -213,12 +263,11 @@ def runner(tmp_, outf):
     clusters = rec_mcl(m)
     output_from_clusters(ids, clusters, outf)
     G = nx.from_numpy_matrix(m)
-    # clf = danmf.DANMF(layers=[96, 20],
-    #                   iterations=10000,
-    #                   pre_iterations=1000,
-    #                   lamb=0.0001,
-    #                   )
-    clf = edmot.EdMot()
+    clf = danmf.DANMF(layers=[96, 20],
+                      iterations=1000,
+                      pre_iterations=1000,
+                      lamb=0.0001,
+                      )
     clf.fit(G)
     ids_d = dict(zip(range(0, len(ids)), ids))
     out = []
@@ -229,6 +278,9 @@ def runner(tmp_, outf):
                 out.append([k, ids_d[k], ";".join(list(map(str, v)))])
             except TypeError as e:
                 out.append([k, ids_d[k], str(v)])
+    if plots:
+        df_adj = pd.DataFrame(m, index=ids, columns=ids)
+        heatmap(df_adj)
     out = pd.DataFrame(out, columns=['IDX', 'Identifier', 'Community'])
-    outname = os.path.join(outf, "communities_bigclam.txt")
+    outname = os.path.join(outf, "communities_damf.txt")
     out.to_csv(outname, sep="\t", index=False)
