@@ -56,43 +56,37 @@ def vec_wd_score(arr, norm):
 
 def calc_wd_matrix(m, iteration=1000, q=0.9, norm=False, plot=False):
     """
-    get a NxM matrix and calculate wd then for iteration creates dummy matrix
-    and score them to get distribution of simulated interactors for each bait
-    Args:
-        m stats matrix following http://besra.hms.harvard.edu/ipmsmsdbs/cgi-bin/tutorial.cgi format
-        iteration number of iteration for generating simulated distribution
-        quantile to filter interactors for
-        norm quantile based normalization of interaction
-        plot boolean for plotting distribution of real and simulated data
-    Returns:
-        wd scores matrix
-    """
-    wd = np.array([vec_wd_score(m[i], norm) for i in range(m.shape[1])])
-    i = 0
-    rand_dist = []
-    pdf_r =  m.flatten()
-    # calc pdf
-    pdf_r = pdf_r/ pdf_r.shape[0]
-    # prob = pdf_r[pdf_r>0].shape[0] / pdf_r[pdf_r==0].shape[0]
-    while i < iteration:
-        # p_arr = np.random.negative_binomial(n=1, p=0.01, size=m.shape[0])
-        p_arr = np.random.negative_binomial(n=1, p=1, size=m.shape[0])
-        rand_dist.append(vec_wd_score(p_arr, norm).flatten())
-        print('iteration {} of {}'.format(i, iteration))
-        i+=1
-    p_rnd = np.array(rand_dist).flatten()
-    p_rnd = p_rnd / p_rnd.shape[0]
-    cutoff = 0
-    if p_rnd.any():
-        # cutoff = np.quantile(p_rnd[p_rnd > 0], q)
-        cutoff = np.quantile(p_rnd, q)
-        fdr = calc_fdr(pdf_r, p_rnd.flatten())
-        plot_fdr(pdf_r, p_rnd, cutoff, fdr, 'test_distr.pdf')
-    wd[wd < (cutoff * p_rnd.flatten().shape[0])] = 0
-    cutoff *= p_rnd.flatten().shape[0]
-    print(cutoff)
-    return wd
-
+     get a NxM matrix and calculate wd then for iteration creates dummy matrix
+     and score them to get distribution of simulated interactors for each bait
+     Args:
+         m stats matrix following http://besra.hms.harvard.edu/ipmsmsdbs/cgi-bin/tutorial.cgi format
+         iteration number of iteration for generating simulated distribution
+         quantile to filter interactors for
+         norm quantile based normalization of interaction
+         plot boolean for plotting distribution of real and simulated data
+     Returns:
+         wd scores matrix
+     """
+     wd = np.array([vec_wd_score(m[i], norm) for i in range(m.shape[1])])
+     i = 0
+     rand_dist = []
+     p = m.flatten()
+     while i <= iteration:
+         np.random.shuffle(p)
+         p_arr = np.random.choice(p, m.shape[0])
+         # force to have some numbers inside
+         while not np.any(p_arr):
+             np.random.choice(p, m.shape[0])
+         # print('iteration {} of {}'.format(i, iteration))
+         rand_dist.append(vec_wd_score(p_arr, norm).flatten())
+         i+=1
+     rand_dist = np.array(rand_dist).reshape(-1,1)
+     cutoff = np.quantile(rand_dist[rand_dist > 0], q)
+     # print(cutoff)
+     if plot:
+         plot_distr(wd, rand_dist, cutoff, 'test_distr.pdf')
+     wd[wd < cutoff] = 0
+     return wd
 
 def plot_fdr(target, decoy, cutoff, fdr, plotname):
     """
