@@ -47,20 +47,20 @@ def als(y, lam=10, p=0.5, niter=100, pl=False, fr=75):
 
     y = np.array(y)
     L = len(y)
-    D = sparse.diags([1,-2,1],[0,-1,-2], shape=(L,L-2))
+    D = sparse.diags([1, -2, 1], [0, -1, -2], shape=(L, L - 2))
     D = lam * D.dot(D.transpose())
     w = np.ones(L)
     W = sparse.spdiags(w, 0, L, L)
     for i in range(niter):
         W.setdiag(w)
         Z = W + D
-        z = spsolve(Z, w*y)
-        w = p * (y > z) + (1-p) * (y < z)
+        z = spsolve(Z, w * y)
+        w = p * (y > z) + (1 - p) * (y < z)
     if pl:
         fig = plt.figure()
         ax = plt.subplot(111)
-        ax.plot(list(range(0, fr)), y, label='not rescaled')
-        ax.plot(list(range(0, fr)), z, label='rescaled')
+        ax.plot(list(range(0, fr)), y, label="not rescaled")
+        ax.plot(list(range(0, fr)), z, label="rescaled")
         plt.legend()
         plt.show()
         plt.close()
@@ -130,12 +130,12 @@ def gen_pairs(prot):
     idx = 0
     for p in pairs:
         if np.corrcoef(prot[p[0]], prot[p[1]])[0][-1] > 0:
-            l1 = ','.join(map(str, prot[p[0]]))
-            l2 = ','.join(map(str, prot[p[1]]))
-            row = '#'.join([l1, l2])
-            nm = 'ppi_' + str(idx)
-            ppi.append('\t'.join([nm, '#'.join(p), row]))
-            idx +=1
+            l1 = ",".join(map(str, prot[p[0]]))
+            l2 = ",".join(map(str, prot[p[1]]))
+            row = "#".join([l1, l2])
+            nm = "ppi_" + str(idx)
+            ppi.append("\t".join([nm, "#".join(p), row]))
+            idx += 1
     return ppi
 
 
@@ -170,13 +170,15 @@ def runner(infile, split=False):
     else:
         prot2 = prot
     pr_df = io.create_df(prot2)
+    print(pr_df)
+    assert False
     base = io.file2folder(infile, prefix="./tmp/")
     # create tmp folder and subfolder with name
     if not os.path.isdir(base):
         os.makedirs(base)
     # write transf matrix
     dest = os.path.join(base, "transf_matrix.txt")
-    pr_df.to_csv(dest, sep="\t", encoding="utf-8", index_label='ID')
+    pr_df.to_csv(dest, sep="\t", encoding="utf-8", index_label="ID")
     ppi = gen_pairs(prot2)
     nm = os.path.join(base, "ppi.txt")
     io.wrout(ppi, nm, ["ID", "MB", "FT"])

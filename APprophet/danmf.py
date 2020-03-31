@@ -3,6 +3,7 @@ import networkx as nx
 from sklearn.decomposition import NMF
 from karateclub.estimator import Estimator
 
+
 class DANMF(Estimator):
     """An implementation of `"DANMF" <https://smartyfh.com/Documents/18DANMF.pdf>`_
     from the CIKM '18 paper "Deep Autoencoder-like Nonnegative Matrix Factorization for
@@ -17,14 +18,16 @@ class DANMF(Estimator):
         seed (int): Random seed for weight initializations. Default 42.
         lamb (float): Regularization parameter. Default 0.01.
     """
-    def __init__(self, layers=[32, 8], pre_iterations=100, iterations=100, seed=42, lamb=0.01):
+
+    def __init__(
+        self, layers=[32, 8], pre_iterations=100, iterations=100, seed=42, lamb=0.01
+    ):
         self.layers = layers
         self.pre_iterations = pre_iterations
         self.iterations = iterations
         self.seed = seed
         self.lamb = lamb
         self.p = len(self.layers)
-
 
     def _setup_target_matrices(self, graph):
         """
@@ -34,9 +37,13 @@ class DANMF(Estimator):
             * **graph** *(NetworkX graph)* - The graph being clustered.
         """
         self.graph = graph
-        self.A = nx.adjacency_matrix(self.graph, nodelist=range(self.graph.number_of_nodes()))
-        self.L = nx.laplacian_matrix(self.graph, nodelist=range(self.graph.number_of_nodes()))
-        self.D = self.L+self.A
+        self.A = nx.adjacency_matrix(
+            self.graph, nodelist=range(self.graph.number_of_nodes())
+        )
+        self.L = nx.laplacian_matrix(
+            self.graph, nodelist=range(self.graph.number_of_nodes())
+        )
+        self.D = self.L + self.A
 
     def _setup_z(self, i):
         """
@@ -48,7 +55,7 @@ class DANMF(Estimator):
         if i == 0:
             self.Z = self.A
         else:
-            self.Z = self.V_s[i-1]
+            self.Z = self.V_s[i - 1]
 
     def _sklearn_pretrain(self, i):
         """
@@ -57,10 +64,12 @@ class DANMF(Estimator):
         Arg types:
             * **i** *(int)* - The layer index.
         """
-        nmf_model = NMF(n_components=self.layers[i],
-                        init="random",
-                        random_state=self.seed,
-                        max_iter=self.pre_iterations)
+        nmf_model = NMF(
+            n_components=self.layers[i],
+            init="random",
+            random_state=self.seed,
+            max_iter=self.pre_iterations,
+        )
 
         U = nmf_model.fit_transform(self.Z)
         V = nmf_model.components_
@@ -82,10 +91,10 @@ class DANMF(Estimator):
         """
         Setting up Q matrices.
         """
-        self.Q_s = [None for _ in range(self.p+1)]
-        self.Q_s[self.p] = np.eye(self.layers[self.p-1])
-        for i in range(self.p-1, -1, -1):
-            self.Q_s[i] = np.dot(self.U_s[i], self.Q_s[i+1])
+        self.Q_s = [None for _ in range(self.p + 1)]
+        self.Q_s[self.p] = np.eye(self.layers[self.p - 1])
+        for i in range(self.p - 1, -1, -1):
+            self.Q_s[i] = np.dot(self.U_s[i], self.Q_s[i + 1])
 
     def _update_U(self, i):
         """
@@ -96,14 +105,24 @@ class DANMF(Estimator):
         """
         if i == 0:
             R = self.U_s[0].dot(self.Q_s[1].dot(self.VpVpT).dot(self.Q_s[1].T))
-            R = R+self.A_sq.dot(self.U_s[0].dot(self.Q_s[1].dot(self.Q_s[1].T)))
-            Ru = 2*self.A.dot(self.V_s[self.p-1].T.dot(self.Q_s[1].T))
-            self.U_s[0] = (self.U_s[0]*Ru)/np.maximum(R, 10**-10)
+            R = R + self.A_sq.dot(self.U_s[0].dot(self.Q_s[1].dot(self.Q_s[1].T)))
+            Ru = 2 * self.A.dot(self.V_s[self.p - 1].T.dot(self.Q_s[1].T))
+            self.U_s[0] = (self.U_s[0] * Ru) / np.maximum(R, 10 ** -10)
         else:
-            R = self.P.T.dot(self.P).dot(self.U_s[i]).dot(self.Q_s[i+1]).dot(self.VpVpT).dot(self.Q_s[i+1].T)
-            R = R+self.A_sq.dot(self.P).T.dot(self.P).dot(self.U_s[i]).dot(self.Q_s[i+1]).dot(self.Q_s[i+1].T)
-            Ru = 2*self.A.dot(self.P).T.dot(self.V_s[self.p-1].T).dot(self.Q_s[i+1].T)
-            self.U_s[i] = (self.U_s[i]*Ru)/np.maximum(R, 10**-10)
+            R = (
+                self.P.T.dot(self.P)
+                .dot(self.U_s[i])
+                .dot(self.Q_s[i + 1])
+                .dot(self.VpVpT)
+                .dot(self.Q_s[i + 1].T)
+            )
+            R = R + self.A_sq.dot(self.P).T.dot(self.P).dot(self.U_s[i]).dot(
+                self.Q_s[i + 1]
+            ).dot(self.Q_s[i + 1].T)
+            Ru = 2 * self.A.dot(self.P).T.dot(self.V_s[self.p - 1].T).dot(
+                self.Q_s[i + 1].T
+            )
+            self.U_s[i] = (self.U_s[i] * Ru) / np.maximum(R, 10 ** -10)
 
     def _update_P(self, i):
         """
@@ -124,18 +143,18 @@ class DANMF(Estimator):
         Arg types:
             * **i** *(int)* - The layer index.
         """
-        if i < self.p-1:
-            Vu = 2*self.A.dot(self.P).T
-            Vd = self.P.T.dot(self.P).dot(self.V_s[i])+self.V_s[i]
-            self.V_s[i] = self.V_s[i] * Vu/np.maximum(Vd, 10**-10)
+        if i < self.p - 1:
+            Vu = 2 * self.A.dot(self.P).T
+            Vd = self.P.T.dot(self.P).dot(self.V_s[i]) + self.V_s[i]
+            self.V_s[i] = self.V_s[i] * Vu / np.maximum(Vd, 10 ** -10)
         else:
-            Vu = 2*self.A.dot(self.P).T+(self.lamb*self.A.dot(self.V_s[i].T)).T
+            Vu = 2 * self.A.dot(self.P).T + (self.lamb * self.A.dot(self.V_s[i].T)).T
             Vd = self.P.T.dot(self.P).dot(self.V_s[i])
-            Vd = Vd + self.V_s[i]+(self.lamb*self.D.dot(self.V_s[i].T)).T
-            self.V_s[i] = self.V_s[i] * Vu/np.maximum(Vd, 10**-10)
+            Vd = Vd + self.V_s[i] + (self.lamb * self.D.dot(self.V_s[i].T)).T
+            self.V_s[i] = self.V_s[i] * Vu / np.maximum(Vd, 10 ** -10)
 
     def _setup_VpVpT(self):
-        self.VpVpT = self.V_s[self.p-1].dot(self.V_s[self.p-1].T)
+        self.VpVpT = self.V_s[self.p - 1].dot(self.V_s[self.p - 1].T)
 
     def _setup_Asq(self):
         self.A_sq = self.A.dot(self.A.T)

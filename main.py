@@ -3,22 +3,18 @@
 import argparse
 import configparser
 import sys
-import glob
 import os
-from time import time
 import platform
-from functools import partial
 
 
 # modules
 from APprophet import io_ as io
-from APprophet import exceptions as exceptions
 from APprophet import validate_input as validate
 from APprophet import generate_features as gen_feat
-from APprophet import predict as predict
-from APprophet import preprocess as preprocess
-from APprophet import score as score
-from APprophet import combine as combine
+from APprophet import predict
+from APprophet import preprocess
+from APprophet import score
+from APprophet import combine
 
 
 class ParserHelper(argparse.ArgumentParser):
@@ -96,19 +92,18 @@ def main():
     for infile in files:
         # validate.InputTester(infile, 'in').test_file()
         tmp_folder = io.file2folder(infile, prefix=config['GLOBAL']['temp'])
-        # preprocess.runner(infile)
+        # preprocess.runner(infile)
         # gen_feat.runner(tmp_folder)
-        # predict.runner(tmp_folder)
-    # combine.runner(
-    #             tmp_=config['GLOBAL']['temp'],
-    #             ids=config['GLOBAL']['sid'],
-    #             outf=config['GLOBAL']['out']
-    #             )
+        predict.runner(tmp_folder)
+    combine.runner(
+                tmp_=config['GLOBAL']['temp'],
+                ids=config['GLOBAL']['sid'],
+                outf=config['GLOBAL']['out']
+                )
     score.runner(
                 outf=config['GLOBAL']['out'],
                 tmp_=config['GLOBAL']['temp']
                 )
-
 
 
 if __name__ == '__main__':

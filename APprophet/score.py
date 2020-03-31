@@ -13,6 +13,89 @@ from APprophet import io_ as io
 from APprophet import danmf, mcl
 
 
+def plot_fdr(target, decoy, cutoff, fdr, plotname):
+    """
+    plot of real and simulated data
+     Args:
+        wd is matrix of wd scores from calc_wd
+        sim is distribution of simulated scores
+     Returns:
+        True
+    """
+    wd = target.flatten()
+    sim = decoy.flatten()
+
+    plt.figure(figsize=(6, 6))
+    ax1 = plt.subplot(311)
+    binNum = 200
+    dist = np.unique(np.concatenate((wd, sim)))
+    binwidth = (max(dist) - min(dist)) / binNum
+    plt.hist(
+        wd,
+        bins=np.arange(min(dist), max(dist) + binwidth, binwidth),
+        color="r",
+        edgecolor="r",
+        alpha=0.3,
+        label="Target",
+    )
+    plt.hist(
+        sim,
+        bins=np.arange(min(dist), max(dist) + binwidth, binwidth),
+        color="b",
+        edgecolor="b",
+        alpha=0.3,
+        label="Simulated",
+    )
+    plt.axvline(x=cutoff, color="gray", linestyle="--", linewidth=0.5)
+    plt.ylabel("Frequency")
+    box = ax1.get_position()
+    ax1.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+    ax1.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+
+    ax2 = plt.subplot(312, sharex=ax1)
+    plt.plot(fdr["wd"], fdr["target"], "r", label="P[Target>x]")
+    plt.plot(fdr["wd"], fdr["decoy"], "b--", label="P[Decoy>x]")
+    plt.plot(fdr["wd"], fdr["fdr"], "k", label="FDR")
+    plt.axvline(x=cutoff, color="gray", linestyle="--", linewidth=0.5)
+    plt.xlabel("WD score")
+    plt.ylabel("Probability")
+    plt.legend()
+    box = ax2.get_position()
+    ax2.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+    ax2.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+
+    ax3 = plt.subplot(313)
+    plt.plot(fdr["decoy"], fdr["target"], "k")
+    plt.ylabel("True positive rate")
+    plt.xlabel("False positive rate")
+    box = ax3.get_position()
+    ax3.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+
+    plt.tight_layout()
+    plt.savefig(plotname, dpi=800, bbox_inches="tight")
+    plt.close()
+    return True
+
+
+def calc_fdr(target, decoy):
+    scores = np.unique(np.concatenate((target, decoy)))
+    scores = np.sort(scores)
+    # initialize empty score array
+    fdr = np.zeros(
+        (scores.shape[0],),
+        dtype=[("target", "f4"), ("decoy", "f4"), ("fdr", "f4"), ("wd", "f4")],
+    )
+    for i in range(0, scores.shape[0]):
+        s = scores[i]
+        nt = np.where(target >= s)[0].shape[0] / target.shape[0]
+        nd = np.where(decoy >= s)[0].shape[0] / decoy.shape[0]
+        if nt == 0 or (nd / nt) > 1.0:
+            fdr[i,] = (nt, nd, 1.0, s)
+        else:
+            fdr[i,] = (nt, nd, nd / nt, s)
+    return fdr
+
+
 def normalize_wd(wd_arr, norm_=0.9):
     """
     normalize
@@ -35,14 +118,14 @@ def vec_wd_score(arr, norm):
         a single wd score for this row
     Raises:
     """
-    pres = arr[arr>0].shape[0]
-    npres = arr[arr==0].shape[0]
+    pres = arr[arr > 0].shape[0]
+    npres = arr[arr == 0].shape[0]
     if pres == 0:
         return np.zeros(arr.shape)
-    ntot =pres+npres
-    mu_ = np.sum(arr)/ntot
-    sum_sq_err = np.sum((arr - mu_)**2) + ((mu_**2) * npres)
-    sd_prey = np.sqrt(sum_sq_err / (ntot-1))
+    ntot = pres + npres
+    mu_ = np.sum(arr) / ntot
+    sum_sq_err = np.sum((arr - mu_) ** 2) + ((mu_ ** 2) * npres)
+    sd_prey = np.sqrt(sum_sq_err / (ntot - 1))
     wj = sd_prey / mu_
     if wj < 1:
         wj = 1
@@ -56,97 +139,10 @@ def vec_wd_score(arr, norm):
 
 def calc_wd_matrix(m, iteration=1000, q=0.9, norm=False, plot=False):
     """
-     get a NxM matrix and calculate wd then for iteration creates dummy matrix
-     and score them to get distribution of simulated interactors for each bait
-     Args:
-         m stats matrix following http://besra.hms.harvard.edu/ipmsmsdbs/cgi-bin/tutorial.cgi format
-         iteration number of iteration for generating simulated distribution
-         quantile to filter interactors for
-         norm quantile based normalization of interaction
-         plot boolean for plotting distribution of real and simulated data
-     Returns:
-         wd scores matrix
-     """
-     wd = np.array([vec_wd_score(m[i], norm) for i in range(m.shape[1])])
-     i = 0
-     rand_dist = []
-     p = m.flatten()
-     while i <= iteration:
-         np.random.shuffle(p)
-         p_arr = np.random.choice(p, m.shape[0])
-         # force to have some numbers inside
-         while not np.any(p_arr):
-             np.random.choice(p, m.shape[0])
-         # print('iteration {} of {}'.format(i, iteration))
-         rand_dist.append(vec_wd_score(p_arr, norm).flatten())
-         i+=1
-     rand_dist = np.array(rand_dist).reshape(-1,1)
-     cutoff = np.quantile(rand_dist[rand_dist > 0], q)
-     # print(cutoff)
-     if plot:
-         plot_distr(wd, rand_dist, cutoff, 'test_distr.pdf')
-     wd[wd < cutoff] = 0
-     return wd
-
-def plot_fdr(target, decoy, cutoff, fdr, plotname):
-    """
-    plot of real and simulated data
-     Args:
-        wd is matrix of wd scores from calc_wd
-        sim is distribution of simulated scores
-     Returns:
-        True
-    """
-    wd = target.flatten()
-    sim = decoy.flatten()
-
-    plt.figure(figsize=(6, 6))
-    ax1 = plt.subplot(311)
-    binNum = 200
-    dist = np.unique(np.concatenate((wd, sim)))
-    binwidth = (max(dist) - min(dist)) / binNum
-    plt.hist(wd, bins=np.arange(min(dist), max(dist) + binwidth, binwidth),
-             color='r', edgecolor='r', alpha=0.3, label='Target')
-    plt.hist(sim, bins=np.arange(min(dist), max(dist) + binwidth, binwidth),
-             color='b', edgecolor='b', alpha=0.3, label='Simulated')
-    plt.axvline(x=cutoff,color='gray',linestyle='--', linewidth=.5)
-    plt.ylabel('Frequency')
-    box = ax1.get_position()
-    ax1.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-    ax1.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-
-    ax2 = plt.subplot(312, sharex=ax1)
-    plt.plot(fdr['wd'], fdr['target'], 'r', label='P[Target>x]')
-    plt.plot(fdr['wd'], fdr['decoy'], 'b--', label='P[Decoy>x]')
-    plt.plot(fdr['wd'], fdr['fdr'], 'k', label='FDR')
-    plt.axvline(x=cutoff,color='gray',linestyle='--', linewidth=.5)
-    plt.xlabel('WD score')
-    plt.ylabel('Probability')
-    plt.legend()
-    box = ax2.get_position()
-    ax2.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-    ax2.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-
-    ax3 = plt.subplot(313)
-    plt.plot(fdr['decoy'], fdr['target'], 'k')
-    plt.ylabel('True positive rate')
-    plt.xlabel('False positive rate')
-    box = ax3.get_position()
-    ax3.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-
-    plt.tight_layout()
-    plt.savefig(plotname, dpi=800, bbox_inches='tight')
-    plt.close()
-    return True
-
-
-<<<<<<< HEAD
-def calc_wd_matrix(m, iteration=1000, q=0.9, norm=False, plot=False):
-    """
     get a NxM matrix and calculate wd then for iteration creates dummy matrix
     and score them to get distribution of simulated interactors for each bait
     Args:
-        m stats matrix following http://besra.hms.harvard.edu/ipmsmsdbs/cgi-bin/tutorial.cgi format
+        m http://besra.hms.harvard.edu/ipmsmsdbs/cgi-bin/tutorial.cgi format
         iteration number of iteration for generating simulated distribution
         quantile to filter interactors for
         norm quantile based normalization of interaction
@@ -166,30 +162,14 @@ def calc_wd_matrix(m, iteration=1000, q=0.9, norm=False, plot=False):
             np.random.choice(p, m.shape[0])
         # print('iteration {} of {}'.format(i, iteration))
         rand_dist.append(vec_wd_score(p_arr, norm).flatten())
-        i+=1
-    rand_dist = np.array(rand_dist).reshape(-1,1)
-    cutoff = np.quantile(rand_dist[rand_dist > 0], q)
+        i += 1
+    rand_dist = np.array(rand_dist).reshape(-1, 1)
+    cutoff = np.quantile(rand_dist, q)
     if plot:
-        plot_distr(wd, rand_dist, cutoff, 'test_distr.pdf')
+        plot_fdr(wd, rand_dist, cutoff, "test_distr.pdf")
+    cutoff = np.quantile(wd.flatten()[wd.flatten() > 0], q)
     wd[wd < cutoff] = 0
     return wd
-=======
-def calc_fdr(target, decoy):
-    scores =  np.unique(np.concatenate((target, decoy)))
-    scores = np.sort(scores)
-    # initialize empty score array
-    fdr = np.zeros((scores.shape[0],),
-                   dtype=[('target', 'f4'), ('decoy', 'f4'), ('fdr', 'f4'), ('wd', 'f4')])
-    for i in range(0, scores.shape[0]):
-        s = scores[i]
-        nt = np.where(target >= s)[0].shape[0] / target.shape[0]
-        nd = np.where(decoy >= s)[0].shape[0] / decoy.shape[0]
-        if nt == 0 or (nd / nt) > 1.0:
-            fdr[i, ] = (nt, nd, 1.0, s)
-        else:
-            fdr[i, ] = (nt, nd, nd / nt, s)
-    return fdr
->>>>>>> b57ca54d04b2a6eadd2758d75276b05f8ca60a57
 
 
 def rec_mcl(adj_matrix):
@@ -198,7 +178,9 @@ def rec_mcl(adj_matrix):
     """
     result = mcl.run_mcl(adj_matrix, verbose=False)
     clusters = mcl.get_clusters(result)
-    opt = mcl.run_mcl(adj_matrix, inflation=optimize_mcl(adj_matrix, result, clusters), verbose=True)
+    opt = mcl.run_mcl(
+        adj_matrix, inflation=optimize_mcl(adj_matrix, result, clusters)
+    )
     clusters = mcl.get_clusters(opt)
     return clusters
 
@@ -211,15 +193,16 @@ def optimize_mcl(matrix, results, clusters):
         clusters = mcl.get_clusters(result)
         qscore = mcl.modularity(matrix=result, clusters=clusters)
         if qscore > newmax:
+            newmax = qscore
             infl = inflation
     return infl
 
 
 def output_from_clusters(nodes, clusters, out):
     idx = 1
-    ids = 'complex'
+    ids = "complex"
     header = ["ComplexID", "ComplexName", "subunits(Gene name)"]
-    path = os.path.join(out, 'communities.txt')
+    path = os.path.join(out, "communities.txt")
     io.create_file(path, header)
     for cmplx in clusters:
         if len(list(cmplx)) > 1:
@@ -241,7 +224,7 @@ def preprocess_matrix(m, ids):
     m[m < 0.5] = 0
     mask = np.all(m == 0, axis=1)
     m = m[~mask]
-    m = m[:,~mask]
+    m = m[:, ~mask]
     ids = list(np.array(ids)[~mask])
     return m, ids
 
@@ -251,122 +234,54 @@ def to_adj_lst(adj_m):
     converts adjacency matrix to adj list
     """
     idx = np.triu_indices(n=adj_m.shape[0])
-    v = adj_m[idx].reshape(-1,1)
-    col = idx[0].reshape(-1,1)
-    row = idx[1].reshape(-1,1)
+    v = adj_m[idx].reshape(-1, 1)
+    col = idx[0].reshape(-1, 1)
+    row = idx[1].reshape(-1, 1)
     final = np.concatenate((row, col, v), axis=1)
     return final
 
 
-def heatmap(adj):
-    import seaborn as sns
-    import matplotlib.pyplot as plt
-
-    adj = pd.DataFrame(adj)
-    mask = np.zeros_like(adj, dtype=np.bool)
-    mask[np.triu_indices_from(mask)] = True
-    f, ax = plt.subplots(figsize=(11, 9))
-    sns_plot = sns.clustermap(
-                              adj,
-                              vmax=1,
-                              cmap='YlGnBu',
-                              center=0.5,
-                              square=True,
-                              linewidths=.5,
-                              cbar_kws={'shrink': .5}
-                              )
-    sns_plot.savefig('adj_matrix.pdf', dpi=800)
-
-<<<<<<< HEAD
-
-def plot_network(adj, df, community):
-    import igraph as ig
-
-    adj = pd.DataFrame(adj)
-    adj_ids = list(adj.index)
-    comm = max(set(list(community.values())))
-    cols = ig.ClusterColoringPalette(comm + 1)
-    clr = [cols.get(community[x]) for x in list(adj.index)]
-
-    g = ig.Graph.Adjacency((adj.values > 0).tolist())
-    g.to_undirected()
-    weights = adj.values[np.where(adj.values)]
-    g.vs['label'] = adj.index
-    g.es['weight'] = weights
-
-    # remove disconnected nodes
-    g.delete_vertices(g.vs.find(_degree=0))
-
-    ig.plot(
-        g,
-        'PPI_network.pdf',
-        layout='fr',
-        vertex_size=20,
-        vertex_color=clr,
-        edge_width=[x/3 for x in g.es['weight']],
-        labels=True,
-        vertex_frame_color=clr,
-        keep_aspect_ratio=False,
-    )
-
-
 # @io.timeit
-=======
 @io.timeit
->>>>>>> b57ca54d04b2a6eadd2758d75276b05f8ca60a57
 def runner(tmp_, outf, plots=True):
     """
     read folder tmp_ in directory.
     then loop for each file and create a combined file which contains all files
     creates in the tmp_ directory
     """
-    m = np.loadtxt(os.path.join(tmp_, 'adj_mult.csv'), delimiter=',')
-    with open(os.path.join(tmp_, 'ids.pkl'), 'rb') as f:
+    m = np.loadtxt(os.path.join(tmp_, "adj_mult.csv"), delimiter=",")
+    with open(os.path.join(tmp_, "ids.pkl"), "rb") as f:
         ids = pickle.load(f)
     # print('calculating wd score\n')
-    m, ids = preprocess_matrix(m, ids)
-    # calc wd score per matrix
-<<<<<<< HEAD
-    wd = calc_wd_matrix(m, iteration=20, q=0.25, plot=True)
-=======
-    wd = calc_wd_matrix(m, iteration=1000, q=0.99, plot=True)
->>>>>>> b57ca54d04b2a6eadd2758d75276b05f8ca60a57
+    #  m, ids = preprocess_matrix(m, ids)
+    wd = calc_wd_matrix(m, iteration=1000, q=0.99, norm=False, plot=False)
     wd_ls = to_adj_lst(wd)
     df = pd.DataFrame(wd_ls)
     ids_d = dict(zip(range(0, len(ids)), ids))
-    df.columns = ['protA', 'protB', 'WD']
-    df['protA'] = df['protA'].map(ids_d)
-    df['protB'] = df['protB'].map(ids_d)
-    df.to_csv(os.path.join(outf, 'wd_scores.txt'), sep="\t", index=False)
+    df.columns = ["protA", "protB", "WD"]
+    df["protA"] = df["protA"].map(ids_d)
+    df["protB"] = df["protB"].map(ids_d)
+    df.to_csv(os.path.join(outf, "wd_scores.txt"), sep="\t", index=False)
     # now we use wd score to filter prob
     m[wd == 0] = 0
-    m,ids = preprocess_matrix(m, ids)
+    m, ids = preprocess_matrix(m, ids)
     # print('Predicting complexes from network\n')
     clusters = rec_mcl(m)
     output_from_clusters(ids, clusters, outf)
     G = nx.from_numpy_matrix(m)
-    clf = danmf.DANMF(layers=[96, 20],
-                      iterations=1000,
-                      pre_iterations=1000,
-<<<<<<< HEAD
-                      lamb=0.0001,
-=======
-                      lamb=0.001,
->>>>>>> b57ca54d04b2a6eadd2758d75276b05f8ca60a57
-                      )
+    clf = danmf.DANMF(
+        layers=[96, 20], iterations=1000, pre_iterations=1000, lamb=0.001,
+    )
     clf.fit(G)
     ids_d = dict(zip(range(0, len(ids)), ids))
     out = []
-    for k,v in clf.get_memberships().items():
+    for k, v in clf.get_memberships().items():
         # this returns a dict of list where list is [cluster nr1, nr2, nr3]
         if ids_d.get(k, False):
             try:
                 out.append([k, ids_d[k], ";".join(list(map(str, v)))])
-            except TypeError as e:
+            except TypeError:
                 out.append([k, ids_d[k], str(v)])
-    if plots:
-        df_adj = pd.DataFrame(m, index=ids, columns=ids)
-        heatmap(df_adj)
-    out = pd.DataFrame(out, columns=['IDX', 'Identifier', 'Community'])
+    out = pd.DataFrame(out, columns=["IDX", "Identifier", "Community"])
     outname = os.path.join(outf, "communities_damf.txt")
     out.to_csv(outname, sep="\t", index=False)

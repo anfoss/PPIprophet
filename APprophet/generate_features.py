@@ -16,11 +16,13 @@ class ProteinProfile(object):
     """
     docstring for ProteinProfile
     """
+
     def __init__(self, acc, inten):
         super(ProteinProfile, self).__init__()
         self.acc = acc
         self.inten = np.array([float(x) for x in inten])
         self.peaks = []
+
     def get_inte(self):
         return self.inten
 
@@ -39,7 +41,6 @@ class ProteinProfile(object):
         else:
             self.peaks = [int(np.argmax(self.inten))]
         # avoid breakage due to float
-
 
 
 class ComplexProfile(object):
@@ -180,7 +181,7 @@ class ComplexProfile(object):
         #     prot_fwhm = st.fwhm(list(prot_peak))
         #     width.append(prot_fwhm)
         # self.width = np.mean(width)
-        self.width=4
+        self.width = 4
 
     def create_row(self):
         """
@@ -324,6 +325,7 @@ def gen_feat(cmplx):
     else:
         return None, None
 
+
 # wrapper
 def mp_cmplx(filename):
     """
@@ -368,12 +370,12 @@ def runner(base):
     wr, pks = mp_cmplx(filename=cmplx_comb)
     feature_path = os.path.join(base, "mp_feat_norm.txt")
     feat_header = [
-        'ID',
-        'MB',
-        'COR',
-        'SHFT',
-        'DIF',
-        'W',
+        "ID",
+        "MB",
+        "COR",
+        "SHFT",
+        "DIF",
+        "W",
     ]
     io.wrout(wr, feature_path, feat_header)
     peaklist_path = os.path.join(base, "peak_list.txt")
