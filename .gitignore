@@ -138,6 +138,7 @@ dmypy.json
 # folder and files to avoid
 Input/
 tmp/
+Output/
 sample_ids.txt
 sample_ids_dummy.txt
 adj_matrix_combined.txt
