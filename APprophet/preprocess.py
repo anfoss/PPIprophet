@@ -1,13 +1,9 @@
 # !/usr/bin/env python3
 
-import sys
 import os
-import re
 import itertools
-
 import numpy as np
-from sklearn.mixture import GaussianMixture
-
+import pandas as pd
 
 import APprophet.io_ as io
 import APprophet.stats_ as st
@@ -57,7 +53,6 @@ def als(y, lam=10, p=0.5, niter=100, pl=False, fr=75):
         z = spsolve(Z, w * y)
         w = p * (y > z) + (1 - p) * (y < z)
     if pl:
-        fig = plt.figure()
         ax = plt.subplot(111)
         ax.plot(list(range(0, fr)), y, label="not rescaled")
         ax.plot(list(range(0, fr)), z, label="rescaled")
@@ -97,7 +92,7 @@ def fill_zeroes(prot, pk, left_base, right_base):
     arr = prot.copy()
     arr[:left_base] = [0 for aa in arr[:left_base]]
     arr[right_base:] = [0 for aa in arr[right_base:]]
-    right = zero_sequence(arr[pk : len(arr)])
+    right = zero_sequence(arr[pk: len(arr)])
     left = zero_sequence(arr[:pk][::-1])[::-1]
     return left + right
 
@@ -123,8 +118,6 @@ def gen_pairs(prot):
     generate all possible pairs between proteins
     remove self dupl i.e between same protein but different apex
     """
-    count = 0
-    index = 1
     pairs = list(itertools.combinations(list(prot.keys()), 2))
     ppi = []
     idx = 0
@@ -155,6 +148,22 @@ def impute_namean(ls):
     return ls
 
 
+def gen_decoy_ppi(df):
+    """
+    generate a scrambled dataframe from the original one
+    returns a concatenated dataframe
+    add 'decoy' to name
+    """
+    arr = df.values
+    idx = np.random.rand(*arr.shape).argsort(axis=1)
+    # old = np.sum(arr, axis=1)
+    arr = np.take_along_axis(arr, idx, axis=1)
+    # assert np.sum(arr, axis=1) == old
+    pr = [x + '_decoy' for x in list(df.index)]
+    df2 = pd.DataFrame(arr, index=pr)
+    return pd.concat([df, df2])
+
+
 def runner(infile, split=False):
     prot = io.read_txt(infile)
     print("preprocessing " + infile)
@@ -170,8 +179,7 @@ def runner(infile, split=False):
     else:
         prot2 = prot
     pr_df = io.create_df(prot2)
-    print(pr_df)
-    assert False
+    # pr_df = gen_decoy_ppi(pr_df)
     base = io.file2folder(infile, prefix="./tmp/")
     # create tmp folder and subfolder with name
     if not os.path.isdir(base):

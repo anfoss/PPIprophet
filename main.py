@@ -94,12 +94,12 @@ def main():
         tmp_folder = io.file2folder(infile, prefix=config['GLOBAL']['temp'])
         # preprocess.runner(infile)
         # gen_feat.runner(tmp_folder)
-        predict.runner(tmp_folder)
-    combine.runner(
-                tmp_=config['GLOBAL']['temp'],
-                ids=config['GLOBAL']['sid'],
-                outf=config['GLOBAL']['out']
-                )
+        # predict.runner(tmp_folder)
+    # combine.runner(
+    #             tmp_=config['GLOBAL']['temp'],
+    #             ids=config['GLOBAL']['sid'],
+    #             outf=config['GLOBAL']['out']
+    #             )
     score.runner(
                 outf=config['GLOBAL']['out'],
                 tmp_=config['GLOBAL']['temp']
