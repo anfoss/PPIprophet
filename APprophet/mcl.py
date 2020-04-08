@@ -5,6 +5,7 @@ from fractions import Fraction
 from itertools import permutations
 from scipy.sparse import isspmatrix, dok_matrix, find
 import sys
+import networkx as nx
 from matplotlib.pylab import show, cm, axis
 
 
@@ -21,33 +22,6 @@ class Printer(object):
     def print(self, string):
         if self._enabled:
             print(string)
-
-
-def draw_graph(matrix, clusters, **kwargs):
-    """
-    Visualize the clustering
-
-    :param matrix: The unprocessed adjacency matrix
-    :param clusters: list of tuples containing clusters as returned
-                     by 'get_clusters'
-    :param kwargs: Additional keyword arguments to be passed to
-                   networkx.draw_networkx
-    """
-    # make a networkx graph from the adjacency matrix
-    graph = nx.Graph(matrix)
-
-    # map node to cluster id for colors
-    cluster_map = {node: i for i, cluster in enumerate(clusters) for node in cluster}
-    colors = [cluster_map[i] for i in range(len(graph.nodes()))]
-
-    # if colormap not specified in kwargs, use a default
-    if not kwargs.get("cmap", False):
-        kwargs["cmap"] = cm.tab20
-
-    # draw
-    nx.draw_networkx(graph, node_color=colors, **kwargs)
-    axis("off")
-    show(block=False)
 
 
 def sparse_allclose(a, b, rtol=1e-5, atol=1e-8):
@@ -215,7 +189,7 @@ def run_mcl(
     expansion=2,
     inflation=2,
     loop_value=1,
-    iterations=500,
+    iterations=1000,
     pruning_threshold=0.001,
     pruning_frequency=1,
     convergence_check_frequency=1,
@@ -382,7 +356,5 @@ def modularity(matrix, clusters):
 
     delta = delta_matrix(matrix, clusters)
     indices = np.array(delta.nonzero())
-
     Q = sum(matrix[i, j] - expected(i, j) / m for i, j in indices.T) / m
-
     return Q
