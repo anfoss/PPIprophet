@@ -58,12 +58,19 @@ def create_config():
         action='store',
     )
     parser.add_argument(
-        '-fdr',
-        help='false discovery rate for novel complexes',
-        dest='fdr',
+        '-crapome',
+        help='crapome file path',
+        dest='crap',
         action='store',
-        default=0.5,
-        type=float,
+        default="crapome.org.txt",
+    )
+    parser.add_argument(
+        '-thres',
+        help='frequency threshold for crapome',
+        dest='thres',
+        action='store',
+        default=0.3,
+        type=float
     )
     args = parser.parse_args()
 
@@ -73,9 +80,10 @@ def create_config():
         'db': args.database,
         'sid': args.sample_ids,
         'temp': r'./tmp',
-        'out': args.out
+        'out': args.out,
+        'crapome': args.crap,
+        'thresh': args.thres
     }
-    config['POSTPROCESS'] = {'fdr': args.fdr}
 
     # create config ini file for backup
     with open('ProphetConfig.conf', 'w') as conf:
@@ -92,17 +100,19 @@ def main():
     for infile in files:
         # validate.InputTester(infile, 'in').test_file()
         tmp_folder = io.file2folder(infile, prefix=config['GLOBAL']['temp'])
-        # preprocess.runner(infile)
-        # gen_feat.runner(tmp_folder)
-        # predict.runner(tmp_folder)
-    # combine.runner(
-    #             tmp_=config['GLOBAL']['temp'],
-    #             ids=config['GLOBAL']['sid'],
-    #             outf=config['GLOBAL']['out']
-    #             )
+        preprocess.runner(infile)
+        gen_feat.runner(tmp_folder)
+        predict.runner(tmp_folder)
+    combine.runner(
+                tmp_=config['GLOBAL']['temp'],
+                ids=config['GLOBAL']['sid'],
+                outf=config['GLOBAL']['out']
+                )
     score.runner(
                 outf=config['GLOBAL']['out'],
-                tmp_=config['GLOBAL']['temp']
+                tmp_=config['GLOBAL']['temp'],
+                crapome=config['GLOBAL']['crapome'],
+                thresh=config['GLOBAL']['thresh']
                 )
 
 

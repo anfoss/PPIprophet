@@ -1,16 +1,14 @@
 # !/usr/bin/env python3
 
-import sys
 import os
 import pickle
 import matplotlib.pyplot as plt
 
 import pandas as pd
 import numpy as np
-import networkx as nx
 
 from APprophet import io_ as io
-from APprophet import danmf, mcl
+from APprophet import mcl
 
 
 def plot_fdr(target, decoy, cutoff, fdr, plotname):
@@ -24,7 +22,6 @@ def plot_fdr(target, decoy, cutoff, fdr, plotname):
     """
     wd = target.flatten()
     sim = decoy.flatten()
-
     plt.figure(figsize=(6, 6))
     ax1 = plt.subplot(311)
     binNum = 200
@@ -78,6 +75,7 @@ def plot_fdr(target, decoy, cutoff, fdr, plotname):
 
 
 def calc_fdr(target, decoy):
+    # decoy = np.random.choice(decoy, target.shape[0])
     scores = np.unique(np.concatenate((target, decoy)))
     scores = np.sort(scores)
     # initialize empty score array
@@ -90,9 +88,9 @@ def calc_fdr(target, decoy):
         nt = np.where(target >= s)[0].shape[0] / target.shape[0]
         nd = np.where(decoy >= s)[0].shape[0] / decoy.shape[0]
         if nt == 0 or (nd / nt) > 1.0:
-            fdr[i,] = (nt, nd, 1.0, s)
+            fdr[i, ] = (nt, nd, 1.0, s)
         else:
-            fdr[i,] = (nt, nd, nd / nt, s)
+            fdr[i, ] = (nt, nd, nd / nt, s)
     return fdr
 
 
@@ -112,7 +110,7 @@ def vec_wd_score(arr, norm):
     """
     vectorized wd score
     Args:
-        arr: 1d array array
+        arr: 1d array
         norm: boolean for normalization or not
     Returns:
         a single wd score for this row
@@ -153,21 +151,15 @@ def calc_wd_matrix(m, iteration=1000, q=0.9, norm=False, plot=False):
     wd = np.array([vec_wd_score(m[i], norm) for i in range(m.shape[1])])
     i = 0
     rand_dist = []
-    # p = m.flatten()
     while i <= iteration:
-        # np.random.shuffle(p)
-        # p_arr = np.random.choice(p, m.shape[0])
-        # # force to have some numbers inside
-        # while not np.any(p_arr):
-        #     np.random.choice(p, m.shape[0])
         p_arr = np.random.lognormal(size=m.shape[0])
         # print('iteration {} of {}'.format(i, iteration))
         rand_dist.append(vec_wd_score(p_arr, norm).flatten())
         i += 1
-    rand_dist = np.array(rand_dist).reshape(-1, 1)
+    rand_dist = np.array(rand_dist).flatten()
     cutoff = np.quantile(rand_dist, q)
     if plot:
-        fdr = calc_fdr(wd.flatten().reshape(-1, 1), rand_dist)
+        fdr = calc_fdr(wd.flatten(), rand_dist)
         plot_fdr(wd, rand_dist, cutoff, fdr, "test_distr.pdf")
     cutoff = np.quantile(wd.flatten()[wd.flatten() > 0], q)
     wd[wd < cutoff] = 0
@@ -247,9 +239,30 @@ def to_adj_lst(adj_m):
     return final
 
 
-# @io.timeit
+def filter_crap(m, ids, crap, thres):
+    """
+    read crapome and applies frequency filter. need to work on GENE NAMES
+    Args:
+    Returns:
+    Raises:
+    """
+    def freq(x):
+        return x[x > 0].shape[0] / x.shape[0]
+
+    crap = pd.read_csv(crap, sep="\t")
+    crap.set_index('Gene', inplace=True)
+    crap.drop(['RefSeq', 'UniProt'], axis=1, inplace=True)
+    crap['ss'] = crap.apply(lambda x: freq(x.values), axis=1)
+    crap = crap[crap['ss'] >= float(thres)]
+    mask = np.isin(np.array(ids), crap.index.values)
+    ids = list(np.array(ids)[~mask])
+    m = m[~mask]
+    m = m[:, ~mask]
+    return m, ids
+
+
 @io.timeit
-def runner(tmp_, outf, plots=True):
+def runner(tmp_, outf, crapome, thresh):
     """
     read folder tmp_ in directory.
     then loop for each file and create a combined file which contains all files
@@ -259,8 +272,9 @@ def runner(tmp_, outf, plots=True):
     with open(os.path.join(tmp_, "ids.pkl"), "rb") as f:
         ids = pickle.load(f)
     # print('calculating wd score\n')
-    m, ids = preprocess_matrix(m, ids)
-    wd = calc_wd_matrix(m, iteration=10000, q=0.95, norm=False, plot=True)
+    # m, ids = preprocess_matrix(m, ids)
+    m, ids = filter_crap(m, ids, crapome, thresh)
+    wd = calc_wd_matrix(m, iteration=10000, q=0.96, norm=False, plot=False)
     wd_ls = to_adj_lst(wd)
     df = pd.DataFrame(wd_ls)
     ids_d = dict(zip(range(0, len(ids)), ids))

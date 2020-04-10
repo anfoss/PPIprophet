@@ -11,7 +11,6 @@ def mean(numbers, as_decimal=False):
     compute mean
     """
     if sum([float(x) for x in numbers]) > 0:
-        m = (sum(numbers)) / max(len(numbers), 1)
         return m
     else:
         return 0
