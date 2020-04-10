@@ -69,7 +69,7 @@ def create_config():
         help='frequency threshold for crapome',
         dest='thres',
         action='store',
-        default=0.3,
+        default=0.15,
         type=float
     )
     args = parser.parse_args()
@@ -100,14 +100,14 @@ def main():
     for infile in files:
         # validate.InputTester(infile, 'in').test_file()
         tmp_folder = io.file2folder(infile, prefix=config['GLOBAL']['temp'])
-        preprocess.runner(infile)
-        gen_feat.runner(tmp_folder)
-        predict.runner(tmp_folder)
-    combine.runner(
-                tmp_=config['GLOBAL']['temp'],
-                ids=config['GLOBAL']['sid'],
-                outf=config['GLOBAL']['out']
-                )
+    #     preprocess.runner(infile)
+    #     gen_feat.runner(tmp_folder)
+    #     predict.runner(tmp_folder)
+    # combine.runner(
+    #             tmp_=config['GLOBAL']['temp'],
+    #             ids=config['GLOBAL']['sid'],
+    #             outf=config['GLOBAL']['out']
+    #             )
     score.runner(
                 outf=config['GLOBAL']['out'],
                 tmp_=config['GLOBAL']['temp'],

@@ -161,7 +161,8 @@ def calc_wd_matrix(m, iteration=1000, q=0.9, norm=False, plot=False):
     if plot:
         fdr = calc_fdr(wd.flatten(), rand_dist)
         plot_fdr(wd, rand_dist, cutoff, fdr, "test_distr.pdf")
-    cutoff = np.quantile(wd.flatten()[wd.flatten() > 0], q)
+    # cutoff = np.quantile(wd.flatten()[wd.flatten() > 0], q)
+    print(cutoff)
     wd[wd < cutoff] = 0
     print(cutoff)
     return wd
@@ -184,13 +185,13 @@ def rec_mcl(adj_matrix):
 
 def optimize_mcl(matrix, results, clusters):
     newmax = 0
-    infl = 0
-    for inflation in [i / 10 for i in range(20, 40)]:
+    infl = 2
+    for inflation in np.linspace(1.1, 5, 500):
         result = mcl.run_mcl(matrix, inflation=inflation)
         clusters = mcl.get_clusters(result)
         qscore = mcl.modularity(matrix=result, clusters=clusters)
         if qscore > newmax:
-            print('Updating Q={} from{}'.format(qscore, newmax))
+            print('Updating Q={} from {}'.format(qscore, newmax))
             newmax = qscore
             infl = inflation
     return infl
@@ -248,7 +249,6 @@ def filter_crap(m, ids, crap, thres):
     """
     def freq(x):
         return x[x > 0].shape[0] / x.shape[0]
-
     crap = pd.read_csv(crap, sep="\t")
     crap.set_index('Gene', inplace=True)
     crap.drop(['RefSeq', 'UniProt'], axis=1, inplace=True)
@@ -272,9 +272,8 @@ def runner(tmp_, outf, crapome, thresh):
     with open(os.path.join(tmp_, "ids.pkl"), "rb") as f:
         ids = pickle.load(f)
     # print('calculating wd score\n')
-    # m, ids = preprocess_matrix(m, ids)
     m, ids = filter_crap(m, ids, crapome, thresh)
-    wd = calc_wd_matrix(m, iteration=10000, q=0.96, norm=False, plot=False)
+    wd = calc_wd_matrix(m, iteration=10000, q=0.33, norm=False, plot=False)
     wd_ls = to_adj_lst(wd)
     df = pd.DataFrame(wd_ls)
     ids_d = dict(zip(range(0, len(ids)), ids))
@@ -282,25 +281,6 @@ def runner(tmp_, outf, crapome, thresh):
     df["protA"] = df["protA"].map(ids_d)
     df["protB"] = df["protB"].map(ids_d)
     df.to_csv(os.path.join(outf, "wd_scores.txt"), sep="\t", index=False)
-    # now we use wd score to filter prob
-    m[wd == 0] = 0
     m, ids = preprocess_matrix(m, ids)
     clusters = rec_mcl(m)
     output_from_clusters(ids, clusters, outf)
-    # G = nx.from_numpy_matrix(m)
-    # clf = danmf.DANMF(
-    #     layers=[96, 20], iterations=1000, pre_iterations=1000, lamb=0.001,
-    # )
-    # clf.fit(G)
-    # ids_d = dict(zip(range(0, len(ids)), ids))
-    # out = []
-    # for k, v in clf.get_memberships().items():
-    #     # this returns a dict of list where list is [cluster nr1, nr2, nr3]
-    #     if ids_d.get(k, False):
-    #         try:
-    #             out.append([k, ids_d[k], ";".join(list(map(str, v)))])
-    #         except TypeError:
-    #             out.append([k, ids_d[k], str(v)])
-    # out = pd.DataFrame(out, columns=["IDX", "Identifier", "Community"])
-    # outname = os.path.join(outf, "communities_damf.txt")
-    # out.to_csv(outname, sep="\t", index=False)
