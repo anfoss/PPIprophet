@@ -1,3 +1,0 @@
-Sample	cond	group	short_id	repl	fr
-./Input/test1.txt	Ctrl	1	uxt_1	1	75
-./Input/test2.txt	Ctrl	2	uxt_2	2	75

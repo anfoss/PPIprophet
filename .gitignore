@@ -146,3 +146,8 @@ ppi_network.GraphML
 todo.txt
 .DS_Store
 .*pdf
+uxt/*
+Output/*
+Input/*
+tmp/*
+Output_uxt_split/*

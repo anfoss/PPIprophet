@@ -58,9 +58,10 @@ class NetworkCombiner(object):
         # now multiply probabilities
         self.adj_matrx = all_adj.pop()
         for m1 in all_adj:
-            # self.adj_matrx = np.multiply(self.adj_matrx, m1)
-            self.adj_matrx = np.add(self.adj_matrx, m1)
-        return self.adj_matrx / (len(all_adj) + 1)
+            self.adj_matrx = np.multiply(self.adj_matrx, m1)
+            # self.adj_matrx = np.add(self.adj_matrx, m1)
+        # return self.adj_matrx / (len(all_adj) + 1)
+        return self.adj_matrx
 
     def multi_collapse(self):
         self.combined = reduce(
@@ -128,132 +129,28 @@ class TableConverter(object):
             np.savetxt(nm, self.adj, delimiter="\t")
         return True
 
-    def add_fdr(self):
-        """
-        add fdr column to df. sorting is done due to different annotation
-        in prob column (np vs pd)
-        """
-        self.df = pd.merge(
-            self.df,
-            self.fdr[["prob", "fdr"]],
-            left_on="Prob",
-            right_on="prob",
-            how="left",
-        )
-        self.df.drop("prob", inplace=True, axis=1)
-        self.df.fillna(0, inplace=True)
-        return True
-
-    def modify_df(self, fdr_thresh):
-        """
-        substitute 0 to everything below fdr threshold
-        """
-        self.df["Prob"].values[self.df["Prob"] <= fdr_thresh] = 0
+    # def modify_weight(self, bait):
+    #     """
+    #     modify bait with sqrt weight if bait not interacting
+    #     Args:
+    #     Returns:
+    #     Raises:
+    #     """
+    #     for e1, e2 in self.G.edges():
+    #         if e1 != bait and e2 != bait:
+    #             w = self.G[e1][e2]['weight']
+    #             self.G[e1][e2]['weight'] = w**0.5
+    #         elif self.G[e1][e2]['weight'] < 0.5:
+    #             w = self.G[e1][e2]['weight']
+    #             self.G[e1][e2]['weight'] = w**0.5
+    #         else:
+    #             pass
 
     def get_adj_matrx(self):
         return self.adj
 
     def get_df(self):
         return self.df
-
-    def calc_fdr(self, path, bait="UXT", target_fdr=0.2):
-        """
-        get shell level of interaction of bait and then calc local fdr
-        for every pred level
-        """
-        bait_int = self.df[(self.df["ProtA"] == bait) | (self.df["ProtB"] == bait)]
-        bait_int = bait_int[bait_int["Prob"] >= 0.5]
-        allz = list(bait_int["ProtA"])
-        allz.extend(list(bait_int["ProtB"]))
-        allz = set(allz)
-        pos = [bait_int]
-        for p in allz:
-            tmp = self.df[(self.df["ProtA"] == p) | (self.df["ProtB"] == p)]
-            pos.append(tmp[tmp["Prob"] >= 0.5])
-        pos = pd.concat(pos)
-        neg = pd.concat([self.df, pos]).drop_duplicates(keep=False)
-        # neg = neg[neg['Prob']>=0.5]
-        pos, neg = pos["Prob"].values, neg["Prob"].values
-        scores = np.unique(np.concatenate((pos, neg)))
-        scores = np.sort(scores)
-        # initialize empty score array
-        fdr = np.zeros(
-            (scores.shape[0],),
-            dtype=[("target", "f4"), ("decoy", "f4"), ("fdr", "f4"), ("prob", "f4")],
-        )
-        for i in range(0, scores.shape[0]):
-            s = scores[i]
-            nt = np.where(pos >= s)[0].shape[0] / pos.shape[0]
-            nd = np.where(neg >= s)[0].shape[0] / neg.shape[0]
-            if nt == 0 or (nd / nt) > 1.0:
-                fdr[i,] = (nt, nd, 1.0, s)
-            else:
-                fdr[i,] = (nt, nd, nd / nt, s)
-        # plot_fdr(pos, neg, fdr, path)
-        fdr_df = pd.DataFrame(fdr, columns=["target", "decoy", "fdr", "prob"])
-        fdr_df.to_csv(os.path.join(path, "fdr.txt"), index=False, sep="\t")
-        fdr_thresh = 0.5
-        try:
-            # either first value smaller than target
-            fdr_thresh = fdr_df[fdr_df["fdr"] <= target_fdr]["prob"].values[0]
-        except IndexError as e:
-            # or first value bigger than target
-            fdr_thresh = fdr_df[fdr_df["fdr"] >= target_fdr]["prob"].values[-1]
-        print("Estimated prob threshold for {} is {}".format(path, fdr_thresh))
-        self.fdr = fdr_df
-        self.modify_df(fdr_thresh)
-        self.add_fdr()
-
-
-def plot_fdr(target_dist, decoy_dist, fdr, path):
-    plt.figure(figsize=(6, 6))
-    ax1 = plt.subplot(311)
-    binNum = 100.0
-    dist = np.unique(np.concatenate((target_dist, decoy_dist)))
-    binwidth = (max(dist) - min(dist)) / binNum
-
-    plt.hist(
-        target_dist,
-        bins=np.arange(min(dist), max(dist) + binwidth, binwidth),
-        color="r",
-        edgecolor="r",
-        alpha=0.3,
-        label="Target",
-    )
-    plt.hist(
-        decoy_dist,
-        bins=np.arange(min(dist), max(dist) + binwidth, binwidth),
-        color="b",
-        edgecolor="b",
-        alpha=0.3,
-        label="Decoy",
-    )
-    plt.ylabel("Frequency")
-    box = ax1.get_position()
-    ax1.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-    ax1.legend(loc="center left", bbox_to_anchor=(1, 0.5))
-
-    ax2 = plt.subplot(312, sharex=ax1)
-    plt.plot(fdr["prob"], fdr["target"], "r", label="P[Target>x]")
-    plt.plot(fdr["prob"], fdr["decoy"], "b--", label="P[Decoy>x]")
-    plt.plot(fdr["prob"], fdr["fdr"], "k", label="FDR")
-    plt.xlabel("DNN probability")
-    plt.legend()
-    box = ax2.get_position()
-    ax2.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-    ax2.legend(loc="center left", bbox_to_anchor=(1, 0.5))
-
-    ax3 = plt.subplot(313)
-    plt.plot(fdr["decoy"], fdr["target"], "k")
-    plt.ylabel("True positive rate")
-    plt.xlabel("False positive rate")
-    box = ax3.get_position()
-    ax3.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-
-    plt.tight_layout()
-    outfile = os.path.join(path, "fdr.pdf")
-    plt.savefig(outfile, dpi=800, bbox_inches="tight")
-    return True
 
 
 def fully_connected(l, w=10 ** -17):
@@ -288,6 +185,7 @@ def runner(tmp_, ids, outf):
         allids.extend(list(pd.read_csv(raw_matrix, sep="\t")["ID"]))
         exp = TableConverter(name=exp_info[base], table=pred_out, cond=pred_out)
         exp.convert_to_network()
+        # exp.modify_weight(bait='UXT')
         exp.weight_adj_matrx(smpl, write=True)
         allexps.add_exp(exp)
     allexps.create_dfs()

@@ -3,6 +3,8 @@
 import os
 import pickle
 import matplotlib.pyplot as plt
+import networkx as nx
+import karateclub
 
 import pandas as pd
 import numpy as np
@@ -116,6 +118,7 @@ def vec_wd_score(arr, norm):
         a single wd score for this row
     Raises:
     """
+    # need to elevate to the distance from the bait
     pres = arr[arr > 0].shape[0]
     npres = arr[arr == 0].shape[0]
     if pres == 0:
@@ -148,6 +151,9 @@ def calc_wd_matrix(m, iteration=1000, q=0.9, norm=False, plot=False):
     Returns:
         wd scores matrix
     """
+    # convert to information content
+    # convert to entropy
+    m = np.array([-np.log2(1 - m[i]) for i in range(m.shape[1])])
     wd = np.array([vec_wd_score(m[i], norm) for i in range(m.shape[1])])
     i = 0
     rand_dist = []
@@ -161,10 +167,7 @@ def calc_wd_matrix(m, iteration=1000, q=0.9, norm=False, plot=False):
     if plot:
         fdr = calc_fdr(wd.flatten(), rand_dist)
         plot_fdr(wd, rand_dist, cutoff, fdr, "test_distr.pdf")
-    # cutoff = np.quantile(wd.flatten()[wd.flatten() > 0], q)
-    print(cutoff)
     wd[wd < cutoff] = 0
-    print(cutoff)
     return wd
 
 
@@ -175,10 +178,10 @@ def rec_mcl(adj_matrix):
     result = mcl.run_mcl(adj_matrix, verbose=False)
     clusters = mcl.get_clusters(result)
     opt = mcl.run_mcl(
-                       adj_matrix,
-                       expansion=2,
-                       inflation=optimize_mcl(adj_matrix, result, clusters)
-                       )
+                      adj_matrix,
+                      expansion=2,
+                      inflation=optimize_mcl(adj_matrix, result, clusters)
+                      )
     clusters = mcl.get_clusters(opt)
     return clusters
 
@@ -191,7 +194,7 @@ def optimize_mcl(matrix, results, clusters):
         clusters = mcl.get_clusters(result)
         qscore = mcl.modularity(matrix=result, clusters=clusters)
         if qscore > newmax:
-            print('Updating Q={} from {}'.format(qscore, newmax))
+            # print('Updating Q={} from {}'.format(qscore, newmax))
             newmax = qscore
             infl = inflation
     return infl
@@ -253,6 +256,7 @@ def filter_crap(m, ids, crap, thres):
     crap.set_index('Gene', inplace=True)
     crap.drop(['RefSeq', 'UniProt'], axis=1, inplace=True)
     crap['ss'] = crap.apply(lambda x: freq(x.values), axis=1)
+    # print(crap[crap.index.str.contains('^POL')])
     crap = crap[crap['ss'] >= float(thres)]
     mask = np.isin(np.array(ids), crap.index.values)
     ids = list(np.array(ids)[~mask])
@@ -273,14 +277,29 @@ def runner(tmp_, outf, crapome, thresh):
         ids = pickle.load(f)
     # print('calculating wd score\n')
     m, ids = filter_crap(m, ids, crapome, thresh)
-    wd = calc_wd_matrix(m, iteration=10000, q=0.33, norm=False, plot=False)
-    wd_ls = to_adj_lst(wd)
+    m, ids = preprocess_matrix(m, ids)
+    wd = calc_wd_matrix(m, iteration=10000, q=0.30, norm=False, plot=False)
+    wd_ls = to_adj_lst(m)
     df = pd.DataFrame(wd_ls)
     ids_d = dict(zip(range(0, len(ids)), ids))
-    df.columns = ["protA", "protB", "WD"]
-    df["protA"] = df["protA"].map(ids_d)
-    df["protB"] = df["protB"].map(ids_d)
-    df.to_csv(os.path.join(outf, "wd_scores.txt"), sep="\t", index=False)
+    df.columns = ["ProtA", "ProtB", "WD"]
+    df["ProtA"] = df["ProtA"].map(ids_d)
+    df["ProtB"] = df["ProtB"].map(ids_d)
+    df.to_csv(os.path.join(outf, "d_scores.txt"), sep="\t", index=False)
     m, ids = preprocess_matrix(m, ids)
     clusters = rec_mcl(m)
     output_from_clusters(ids, clusters, outf)
+    spl = karateclub.EgoNetSplitter(10)
+    spl.fit(nx.from_numpy_matrix(m))
+    out = {}
+    ids_d = dict(zip(range(0, len(ids)), ids))
+    for k, v in spl.get_memberships().items():
+        for cl_id in v:
+            if out.get(cl_id):
+                out[cl_id].append(ids_d[k])
+            else:
+                out[cl_id] = [ids_d[k]]
+    todf = {k: ','.join(v) for k, v in out.items()}
+    out = pd.DataFrame.from_dict(todf, orient='index')
+    outname = os.path.join(outf, "communities_out.txt")
+    out.to_csv(outname, sep="\t", index=True)
