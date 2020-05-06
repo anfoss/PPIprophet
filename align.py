@@ -15,6 +15,7 @@ def equalize_array_size(array1,array2):
     reduce the size of one sample to make them equal size.
     The sides of the biggest signal are truncated
 
+    -
     Args:
         array1 (1d array/list): signal for example the reference
         array2 (1d array/list): signal for example the target
