@@ -55,12 +55,8 @@ class NetworkCombiner(object):
             self.ids = sorted(nd)
             all_adj.append(adj.todense())
             n += 1
-        # now multiply probabilities
-        self.adj_matrx = all_adj.pop()
-        for m1 in all_adj:
-            self.adj_matrx = np.multiply(self.adj_matrx, m1)
-            # self.adj_matrx = np.add(self.adj_matrx, m1)
-        # return self.adj_matrx / (len(all_adj) + 1)
+        # now take maximum probability per element
+        self.adj_matrx = np.maximum.reduce(all_adj)
         return self.adj_matrx
 
     def multi_collapse(self):
@@ -69,7 +65,7 @@ class NetworkCombiner(object):
         )
         self.combined.fillna(0, inplace=True)
         self.combined.set_index(["ProtA", "ProtB"], inplace=True)
-        self.combined["CombProb"] = np.prod(self.combined.values, axis=1)
+        self.combined["CombProb"] = np.max(self.combined.values, axis=1)
         return self.combined
 
     def get_ids(self):
@@ -129,23 +125,6 @@ class TableConverter(object):
             np.savetxt(nm, self.adj, delimiter="\t")
         return True
 
-    # def modify_weight(self, bait):
-    #     """
-    #     modify bait with sqrt weight if bait not interacting
-    #     Args:
-    #     Returns:
-    #     Raises:
-    #     """
-    #     for e1, e2 in self.G.edges():
-    #         if e1 != bait and e2 != bait:
-    #             w = self.G[e1][e2]['weight']
-    #             self.G[e1][e2]['weight'] = w**0.5
-    #         elif self.G[e1][e2]['weight'] < 0.5:
-    #             w = self.G[e1][e2]['weight']
-    #             self.G[e1][e2]['weight'] = w**0.5
-    #         else:
-    #             pass
-
     def get_adj_matrx(self):
         return self.adj
 
@@ -172,7 +151,6 @@ def runner(tmp_, ids, outf):
     exp_info = io.read_sample_ids(ids)
     strip = lambda x: os.path.splitext(os.path.basename(x))[0]
     exp_info = {strip(k): v for k, v in exp_info.items()}
-    wrout = []
     allexps = NetworkCombiner()
     allids = []
     for smpl in dir_:
@@ -185,7 +163,6 @@ def runner(tmp_, ids, outf):
         allids.extend(list(pd.read_csv(raw_matrix, sep="\t")["ID"]))
         exp = TableConverter(name=exp_info[base], table=pred_out, cond=pred_out)
         exp.convert_to_network()
-        # exp.modify_weight(bait='UXT')
         exp.weight_adj_matrx(smpl, write=True)
         allexps.add_exp(exp)
     allexps.create_dfs()
@@ -205,3 +182,5 @@ def runner(tmp_, ids, outf):
     # m_adj = pd.DataFrame(m_adj, index=ids)
     # m_adj.columns = ids
     # m_adj.to_csv(os.path.join(outf, 'adj_matrix_combined.txt'), sep="\t")
+
+    # output format

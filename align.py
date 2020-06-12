@@ -203,8 +203,8 @@ def runner():
         l.append(tmp)
     not_ali_df = pd.concat(l, sort=False)
     not_ali_df.fillna(0, inplace=True)
-    not_ali_df.drop('Uniprot', axis=1, inplace=True)
-    ali_df = not_ali_df.groupby(['id']).apply(realign_df)
+    # not_ali_df.drop('Uniprot', axis=1, inplace=True)
+    ali_df = not_ali_df.groupby(['GN']).apply(realign_df)
     ali_df.to_csv('2020_final_PFDN2_after_CCprofiler_Rep_aligned.txt', sep="\t")
 
 

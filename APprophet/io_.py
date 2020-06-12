@@ -437,5 +437,11 @@ def timeit(method):
         else:
             print("%r  %2.2f ms" % (method.__name__, (te - ts) * 1000))
         return result
-
     return timed
+
+
+def long_format(df, output):
+    """
+    creates protein centric output giving a file
+    """
+    pass

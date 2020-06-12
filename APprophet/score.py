@@ -143,13 +143,13 @@ def calc_wd_matrix(m, iteration=1000, q=0.9, norm=False, plot=False):
     get a NxM matrix and calculate wd then for iteration creates dummy matrix
     and score them to get distribution of simulated interactors for each bait
     Args:
-        m http://besra.hms.harvard.edu/ipmsmsdbs/cgi-bin/tutorial.cgi format
+        -m: http://besra.hms.harvard.edu/ipmsmsdbs/cgi-bin/tutorial.cgi format
         iteration number of iteration for generating simulated distribution
-        quantile to filter interactors for
-        norm quantile based normalization of interaction
+        -q:  quantile to filter interactors for
+        -norm: quantile based normalization of interaction
         plot boolean for plotting distribution of real and simulated data
     Returns:
-        wd scores matrix
+        wd: scores matrix filtered
     """
     # convert to information content
     # convert to entropy
@@ -215,7 +215,7 @@ def output_from_clusters(nodes, clusters, out):
     return True
 
 
-def preprocess_matrix(m, ids):
+def preprocess_matrix(m, ids, cutoff=0.5):
     """
     take a matrix and reshape
      Args:
@@ -223,7 +223,7 @@ def preprocess_matrix(m, ids):
      Raises:
     """
     # remove rows with all non significant interaction
-    m[m < 0.5] = 0
+    m[m < cutoff] = 0
     mask = np.all(m == 0, axis=1)
     m = m[~mask]
     m = m[:, ~mask]
@@ -279,13 +279,15 @@ def runner(tmp_, outf, crapome, thresh):
     m, ids = filter_crap(m, ids, crapome, thresh)
     m, ids = preprocess_matrix(m, ids)
     wd = calc_wd_matrix(m, iteration=10000, q=0.30, norm=False, plot=False)
-    wd_ls = to_adj_lst(m)
+    wd_ls = to_adj_lst(wd)
     df = pd.DataFrame(wd_ls)
     ids_d = dict(zip(range(0, len(ids)), ids))
     df.columns = ["ProtA", "ProtB", "WD"]
     df["ProtA"] = df["ProtA"].map(ids_d)
     df["ProtB"] = df["ProtB"].map(ids_d)
     df.to_csv(os.path.join(outf, "d_scores.txt"), sep="\t", index=False)
+    # now we need to filter m
+    m[wd==0] = 0
     m, ids = preprocess_matrix(m, ids)
     clusters = rec_mcl(m)
     output_from_clusters(ids, clusters, outf)
