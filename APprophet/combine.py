@@ -138,7 +138,30 @@ def fully_connected(l, w=10 ** -17):
     return G
 
 
-def runner(tmp_, ids, outf):
+def label_inte(subs):
+    if subs['CombProb'] > 0.9:
+        return 'High confidence'
+    elif subs['CombProb'] > 0.75:
+        return 'Medium confidence'
+    elif subs['CombProb'] >= 0.5:
+        return 'Low confidence'
+    else:
+        return 'No interaction'
+
+
+def reshape_df(subs):
+    subs = subs[subs['CombProb'] >= 0.5]
+    if 'ProtB' in subs.columns:
+        col = 'ProtB'
+    else:
+        col = 'ProtA'
+    inter = list(subs[col])
+    if len(inter) > 0:
+        return pd.Series([",".join(inter), len(inter)])
+
+
+
+def runner(tmp_, ids, outf, crapome):
     """
     read folder tmp in directory.
     then loop for each file and create a combined file which contains all files
@@ -168,6 +191,7 @@ def runner(tmp_, ids, outf):
     allexps.create_dfs()
     allexps.combine_graphs(allids)
     m_adj = allexps.adj_matrix_multi()
+    np.savetxt(os.path.join(tmp_, "adj_mult.csv"), m_adj, delimiter=",")
     ids = allexps.get_ids()
     with open(os.path.join(tmp_, "ids.pkl"), "wb") as f:
         pickle.dump(ids, f)
@@ -175,12 +199,20 @@ def runner(tmp_, ids, outf):
     # protA protB format
     outname = os.path.join(outf, "adj_list.txt")
     outfile = allexps.multi_collapse()
-    outfile.to_csv(os.path.join(outname), sep="\t", index=True)
-
+    outfile.reset_index(inplace=True)
+    outfile['confidence'] = outfile.apply(label_inte, axis=1)
+    crap = io.read_crap(crapome)
+    outfile['Frequency_crapome_ProtA'] = outfile['ProtA'].map(crap)
+    outfile['Frequency_crapome_ProtB'] = outfile['ProtB'].map(crap)
+    outfile.fillna(0, inplace=True)
+    outfile.to_csv(os.path.join(outname), sep="\t", index=False)
     # adj matrix
-    np.savetxt(os.path.join(tmp_, "adj_mult.csv"), m_adj, delimiter=",")
     # m_adj = pd.DataFrame(m_adj, index=ids)
     # m_adj.columns = ids
     # m_adj.to_csv(os.path.join(outf, 'adj_matrix_combined.txt'), sep="\t")
-
-    # output format
+    reshaped = outfile.groupby(['ProtA']).apply(reshape_df)
+    reshaped2 = outfile.groupby(['ProtB']).apply(reshape_df)
+    reshaped = pd.concat([reshaped, reshaped2])
+    reshaped.columns = ['interactors', '# interactors']
+    outname2 = os.path.join(outf, "prot_centr.txt")
+    reshaped.to_csv(os.path.join(outname2), sep="\t", index=True)

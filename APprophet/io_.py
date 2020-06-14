@@ -440,8 +440,17 @@ def timeit(method):
     return timed
 
 
-def long_format(df, output):
+def read_crap(crap):
     """
-    creates protein centric output giving a file
+    read crapome and applies frequency filter. need to work on GENE NAMES
+    Args:
+    Returns:
+    Raises:
     """
-    pass
+    def freq(x):
+        return x[x > 0].shape[0] / x.shape[0]
+    crap = pd.read_csv(crap, sep="\t")
+    crap.set_index('Gene', inplace=True)
+    crap.drop(['RefSeq', 'UniProt'], axis=1, inplace=True)
+    crap['ss'] = crap.apply(lambda x: freq(x.values), axis=1)
+    return dict(zip(crap.index, crap['ss'].values))
