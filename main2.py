@@ -13,7 +13,6 @@ from APprophet import validate_input as validate
 from APprophet import generate_features as gen_feat
 from APprophet import predict
 from APprophet import preprocess
-from APprophet import create_output
 from APprophet import combine
 
 
@@ -106,7 +105,8 @@ def main():
     combine.runner(
                 tmp_=config['GLOBAL']['temp'],
                 ids=config['GLOBAL']['sid'],
-                outf=config['GLOBAL']['out']
+                outf=config['GLOBAL']['out'],
+                crapome=config['GLOBAL']['crapome']
                 )
 
 
