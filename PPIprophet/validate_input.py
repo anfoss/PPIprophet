@@ -1,4 +1,4 @@
-import APprophet.exceptions as PCpexc
+import PPIprophet.exceptions as PCpexc
 import pandas as pd
 
 

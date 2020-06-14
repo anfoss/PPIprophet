@@ -5,8 +5,8 @@ import itertools
 import numpy as np
 import pandas as pd
 
-import APprophet.io_ as io
-import APprophet.stats_ as st
+import PPIprophet.io_ as io
+import PPIprophet.stats_ as st
 
 
 # standardize and center methods

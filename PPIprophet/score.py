@@ -9,8 +9,8 @@ import karateclub
 import pandas as pd
 import numpy as np
 
-from APprophet import io_ as io
-from APprophet import mcl
+from PPIprophet import io_ as io
+from PPIprophet import mcl
 
 
 def plot_fdr(target, decoy, cutoff, fdr, plotname):

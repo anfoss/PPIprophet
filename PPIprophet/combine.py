@@ -12,7 +12,7 @@ import numpy as np
 import networkx as nx
 
 
-from APprophet import io_ as io
+from PPIprophet import io_ as io
 
 
 class NetworkCombiner(object):
@@ -157,7 +157,7 @@ def reshape_df(subs):
         col = 'ProtA'
     inter = list(subs[col])
     if len(inter) > 0:
-        return pd.Series([",".join(inter), len(inter)])
+        return pd.Series([",".join(inter), int(len(inter))])
 
 
 
@@ -212,6 +212,7 @@ def runner(tmp_, ids, outf, crapome):
     # m_adj.to_csv(os.path.join(outf, 'adj_matrix_combined.txt'), sep="\t")
     reshaped = outfile.groupby(['ProtA']).apply(reshape_df)
     reshaped2 = outfile.groupby(['ProtB']).apply(reshape_df)
+    print(list(reshaped), list(reshaped2))
     reshaped = pd.concat([reshaped, reshaped2])
     reshaped.columns = ['interactors', '# interactors']
     outname2 = os.path.join(outf, "prot_centr.txt")

@@ -6,10 +6,10 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 
-from APprophet import io_ as io
+from PPIprophet import io_ as io
 
 
-def runner(base, modelname="./APprophet/APprophet_dnn_no_width.h5"):
+def runner(base, modelname="./PPIprophet/PPIprophet_dnn_no_width.h5"):
     infile = os.path.join(base, "mp_feat_norm.txt")
     model = tf.keras.models.load_model(modelname)
     X, memo = io.prepare_feat(infile)

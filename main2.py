@@ -8,12 +8,12 @@ import platform
 
 
 # modules
-from APprophet import io_ as io
-from APprophet import validate_input as validate
-from APprophet import generate_features as gen_feat
-from APprophet import predict
-from APprophet import preprocess
-from APprophet import combine
+from PPIprophet import io_ as io
+from PPIprophet import validate_input as validate
+from PPIprophet import generate_features as gen_feat
+from PPIprophet import predict
+from PPIprophet import preprocess
+from PPIprophet import combine
 
 
 class ParserHelper(argparse.ArgumentParser):

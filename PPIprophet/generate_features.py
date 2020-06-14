@@ -8,8 +8,8 @@ from scipy.ndimage import uniform_filter
 import multiprocessing as mp
 
 
-import APprophet.io_ as io
-import APprophet.stats_ as st
+import PPIprophet.io_ as io
+import PPIprophet.stats_ as st
 
 
 class ProteinProfile(object):
