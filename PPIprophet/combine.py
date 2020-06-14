@@ -160,7 +160,6 @@ def reshape_df(subs):
         return pd.Series([",".join(inter), int(len(inter))])
 
 
-
 def runner(tmp_, ids, outf, crapome):
     """
     read folder tmp in directory.
@@ -210,10 +209,16 @@ def runner(tmp_, ids, outf, crapome):
     # m_adj = pd.DataFrame(m_adj, index=ids)
     # m_adj.columns = ids
     # m_adj.to_csv(os.path.join(outf, 'adj_matrix_combined.txt'), sep="\t")
-    reshaped = outfile.groupby(['ProtA']).apply(reshape_df)
-    reshaped2 = outfile.groupby(['ProtB']).apply(reshape_df)
-    print(list(reshaped), list(reshaped2))
-    reshaped = pd.concat([reshaped, reshaped2])
-    reshaped.columns = ['interactors', '# interactors']
+    # TODO fix here all bool f
+    mask = pd.Series.eq(outfile['ProtA'], outfile['ProtB'])
+    print(outfile.shape)
+    outfile = outfile[~mask]
+    print(list(set(mask)))
+    assert False
+    reshaped = outfile.groupby(['ProtA']).apply(reshape_df).reset_index()
+    reshaped.columns = ['Protein', 'interactors', '# interactors']
+    reshaped2 = outfile.groupby(['ProtB']).apply(reshape_df).reset_index()
+    reshaped2.columns = ['Protein', 'interactors', '# interactors']
+    reshaped = pd.concat([reshaped, reshaped2]).dropna()
     outname2 = os.path.join(outf, "prot_centr.txt")
-    reshaped.to_csv(os.path.join(outname2), sep="\t", index=True)
+    reshaped.to_csv(os.path.join(outname2), sep="\t", index=False)
