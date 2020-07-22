@@ -43,23 +43,75 @@ class NetworkCombiner(object):
         self.networks = [x.fill_graph(ids_all) for x in self.exps]
         return True
 
+    def calc_freq(self, all_adj):
+        """
+        return a frequency matrix for positive interactions
+        """
+        all_adj = [np.where(x >= 0.5, 1, 0) for x in self.adj_matrx]
+        # here can be done by hand
+        outm = np.zeros(all_adj[0].shape, dtype=np.float64)
+        [outm + x for x in all_adj]
+        print(outm)
+        assert False
+        outm = outm / len(all_adj)
+        freq = np.mean(all_adj, axis=0)
+        print(list(set(list(freq.flatten()))))
+        print(list(set(list(outm.flatten()))))
+        assert False
+        return freq
+
+    def desi_f(self, freq, prob):
+        """
+        weights are hardcoded to 2 as 1:1 can be changed later
+        """
+        return np.exp((1 * np.log(freq) + 1 * np.log(prob)) / 2)
+
     def adj_matrix_multi(self):
         """
         add sparse adj matrix to the adj_matrix container
         """
         all_adj = []
         n = 0
+        # enforce same orderd
+        self.ids = sorted(list(map(str, self.networks[0].nodes())))
         for G in self.networks:
-            nd = list(map(str, G.nodes()))
-            adj = nx.adjacency_matrix(G, nodelist=sorted(nd), weight="weight")
-            self.ids = sorted(nd)
+            adj = nx.adjacency_matrix(G, nodelist=self.ids, weight="weight")
             all_adj.append(adj.todense())
             n += 1
-        # now take maximum probability per element
+        # adj matrix with max prob (no filter)
         self.adj_matrx = np.maximum.reduce(all_adj)
+
+        # calculate frequency
+        freq = self.calc_freq(all_adj)
+        print(np.max(self.adj_matrx.flatten()))
+        assert False
+        desi_vect = np.vectorize(self.desi_f)
+        self.adj_matrx = desi_vect(freq[:, None], self.adj_matrx)
         return self.adj_matrx
 
+    def to_adj_lst(self):
+        """
+        converts adjacency matrix to adj list
+        """
+        idx = np.triu_indices(n=self.adj_matrx.shape[0])
+        v = self.adj_matrx[idx].reshape(-1, 1)
+        col = idx[0].reshape(-1, 1)
+        row = idx[1].reshape(-1, 1)
+        final = np.concatenate((row, col, v), axis=1)
+        ids_d = dict(zip(range(0, len(self.ids)), self.ids))
+        df = pd.DataFrame(final)
+        df.columns = ["ProtA", "ProtB", "WD"]
+        df["ProtA"] = df["ProtA"].map(ids_d)
+        df["ProtB"] = df["ProtB"].map(ids_d)
+        #df = df[df['WD'] >= 0.5]
+        print(np.max(df['WD']), np.min([df['WD']]))
+        return df
+
+
     def multi_collapse(self):
+        """
+        this is not self.adj_matrix!!!
+        """
         self.combined = reduce(
             lambda x, y: pd.merge(x, y, on=["ProtA", "ProtB"], how="outer"), self.dfs
         )
@@ -190,6 +242,7 @@ def runner(tmp_, ids, outf, crapome):
     allexps.create_dfs()
     allexps.combine_graphs(allids)
     m_adj = allexps.adj_matrix_multi()
+    # for score.py
     np.savetxt(os.path.join(tmp_, "adj_mult.csv"), m_adj, delimiter=",")
     ids = allexps.get_ids()
     with open(os.path.join(tmp_, "ids.pkl"), "wb") as f:
@@ -197,8 +250,11 @@ def runner(tmp_, ids, outf, crapome):
 
     # protA protB format
     outname = os.path.join(outf, "adj_list.txt")
-    outfile = allexps.multi_collapse()
-    outfile.reset_index(inplace=True)
+    # outfile = allexps.multi_collapse()
+    outfile = allexps.to_adj_lst()
+    # outfile.reset_index(inplace=True)
+    print(outfile, outfile.shape)
+    assert False
     outfile['confidence'] = outfile.apply(label_inte, axis=1)
     crap = io.read_crap(crapome)
     outfile['Frequency_crapome_ProtA'] = outfile['ProtA'].map(crap)
@@ -210,15 +266,15 @@ def runner(tmp_, ids, outf, crapome):
     # m_adj.columns = ids
     # m_adj.to_csv(os.path.join(outf, 'adj_matrix_combined.txt'), sep="\t")
     # TODO fix here all bool f
-    mask = pd.Series.eq(outfile['ProtA'], outfile['ProtB'])
-    print(outfile.shape)
-    outfile = outfile[~mask]
-    print(list(set(mask)))
-    assert False
+    #  mask = outfile['ProtA'].values == outfile['ProtB'].values
+    # print(outfile)
+    # outfile = outfile[~mask]
+    # print(list(set(mask)))
+    # assert False
     reshaped = outfile.groupby(['ProtA']).apply(reshape_df).reset_index()
     reshaped.columns = ['Protein', 'interactors', '# interactors']
     reshaped2 = outfile.groupby(['ProtB']).apply(reshape_df).reset_index()
     reshaped2.columns = ['Protein', 'interactors', '# interactors']
-    reshaped = pd.concat([reshaped, reshaped2]).dropna()
+    reshaped = pd.concat([reshaped, reshaped2]).dropna().drop_duplicates()
     outname2 = os.path.join(outf, "prot_centr.txt")
     reshaped.to_csv(os.path.join(outname2), sep="\t", index=False)

@@ -14,6 +14,7 @@ from PPIprophet import generate_features as gen_feat
 from PPIprophet import predict
 from PPIprophet import preprocess
 from PPIprophet import combine
+from PPIprophet import score
 
 
 class ParserHelper(argparse.ArgumentParser):
@@ -46,7 +47,7 @@ def create_config():
         '-sid',
         help='sample ids file',
         dest='sample_ids',
-        default='sample_ids.txt',
+        default='sample_ids_comb.txt',
         action='store',
     )
     parser.add_argument(
@@ -99,15 +100,22 @@ def main():
     for infile in files:
         # validate.InputTester(infile, 'in').test_file()
         tmp_folder = io.file2folder(infile, prefix=config['GLOBAL']['temp'])
-    #     preprocess.runner(infile)
-    #     gen_feat.runner(tmp_folder)
-    #     predict.runner(tmp_folder)
+        # preprocess.runner(infile)
+        # gen_feat.runner(tmp_folder)
+        # predict.runner(tmp_folder)
     combine.runner(
                 tmp_=config['GLOBAL']['temp'],
                 ids=config['GLOBAL']['sid'],
                 outf=config['GLOBAL']['out'],
                 crapome=config['GLOBAL']['crapome']
                 )
+    # score.runner(
+    #             outf=config['GLOBAL']['out'],
+    #             tmp_=config['GLOBAL']['temp'],
+    #             crapome=config['GLOBAL']['crapome'],
+    #             thresh=config['GLOBAL']['thresh']
+    #             )
+
 
 
 if __name__ == '__main__':
