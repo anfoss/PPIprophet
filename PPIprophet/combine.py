@@ -80,10 +80,7 @@ class NetworkCombiner(object):
 
         # calculate frequency
         freq = self.calc_freq(all_adj)
-        desi_vect = np.vectorize(self.desi_f)
-        self.adj_matrx = desi_vect(freq[:, None], self.adj_matrx)
-        print(np.max(self.adj_matrx.flatten()))
-        assert False
+        self.adj_matrx = self.desi_f(freq, self.adj_matrx)
         return self.adj_matrx
 
     def to_adj_lst(self):
