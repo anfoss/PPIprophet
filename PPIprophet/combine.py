@@ -47,17 +47,14 @@ class NetworkCombiner(object):
         """
         return a frequency matrix for positive interactions
         """
-        all_adj = [np.where(x >= 0.5, 1, 0) for x in self.adj_matrx]
-        # here can be done by hand
-        outm = np.zeros(all_adj[0].shape, dtype=np.float64)
-        [outm + x for x in all_adj]
-        print(outm)
-        assert False
+
+        all_adj = [np.where(x >= 0.5, 1, 0) for x in all_adj]
+        # here we sum them all
+        outm = np.zeros(all_adj[0].shape, dtype=np.int64)
+        for x in all_adj:
+            outm = outm + x
         outm = outm / len(all_adj)
         freq = np.mean(all_adj, axis=0)
-        print(list(set(list(freq.flatten()))))
-        print(list(set(list(outm.flatten()))))
-        assert False
         return freq
 
     def desi_f(self, freq, prob):
@@ -83,10 +80,10 @@ class NetworkCombiner(object):
 
         # calculate frequency
         freq = self.calc_freq(all_adj)
-        print(np.max(self.adj_matrx.flatten()))
-        assert False
         desi_vect = np.vectorize(self.desi_f)
         self.adj_matrx = desi_vect(freq[:, None], self.adj_matrx)
+        print(np.max(self.adj_matrx.flatten()))
+        assert False
         return self.adj_matrx
 
     def to_adj_lst(self):
