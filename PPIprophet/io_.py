@@ -420,7 +420,7 @@ def prepare_feat(infile, thresh=1, missing=["nan", "na", "", None, "n", "-"]):
     feat_num.replace(to_replace=missing, value=np.nan, inplace=True)
     # remove nan
     feat_num = feat_num.astype(np.float64)
-    feat_num.drop('W', axis=1, inplace=True)
+    feat_num.drop(['W'], axis=1, inplace=True)
     mask = feat_num.isnull().mean(axis=1) <= thresh
     feat_num = feat_num[mask].fillna(0)
     return feat_num.values, memos[mask].values

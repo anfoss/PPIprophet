@@ -288,6 +288,7 @@ def runner(tmp_, outf, crapome, thresh):
     df.to_csv(os.path.join(outf, "d_scores.txt"), sep="\t", index=False)
     # now we need to filter m
     m[wd==0] = 0
+    assert False
     m, ids = preprocess_matrix(m, ids)
     clusters = rec_mcl(m)
     output_from_clusters(ids, clusters, outf)

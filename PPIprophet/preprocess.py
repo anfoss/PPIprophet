@@ -113,21 +113,31 @@ def zero_sequence(arr):
         idx += 1
 
 
-def gen_pairs(prot):
+def gen_pairs(prot, decoy=True, pow=6, thres=0.2):
     """
     generate all possible pairs between proteins
     remove self dupl i.e between same protein but different apex
     """
+    import random
     pairs = list(itertools.combinations(list(prot.keys()), 2))
     ppi = []
     idx = 0
     for p in pairs:
-        if np.corrcoef(prot[p[0]], prot[p[1]])[0][-1] > 0:
+        tmp = np.corrcoef(prot[p[0]], prot[p[1]])[0][-1]
+        # wgna style
+        if tmp > 0 and tmp**pow > thres:
             l1 = ",".join(map(str, prot[p[0]]))
             l2 = ",".join(map(str, prot[p[1]]))
             row = "#".join([l1, l2])
             nm = "ppi_" + str(idx)
             ppi.append("\t".join([nm, "#".join(p), row]))
+            # pick random protein pairs as decoy ppi
+            dec = random.choice(pairs)
+            l1 = ",".join(map(str, prot[dec[0]]))
+            l2 = ",".join(map(str, prot[dec[1]]))
+            row = "#".join([l1, l2])
+            nm = "DECOY_ppi_" + str(idx)
+            ppi.append("\t".join([nm, "#".join([x + '_DECOY' for x in dec]), row]))
             idx += 1
     return ppi
 
@@ -187,7 +197,7 @@ def runner(infile, split=False):
     # write transf matrix
     dest = os.path.join(base, "transf_matrix.txt")
     pr_df.to_csv(dest, sep="\t", encoding="utf-8", index_label="ID")
-    ppi = gen_pairs(prot2)
+    ppi = gen_pairs(prot2, decoy=True)
     nm = os.path.join(base, "ppi.txt")
     io.wrout(ppi, nm, ["ID", "MB", "FT"])
     return True

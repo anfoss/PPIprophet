@@ -29,6 +29,7 @@ class NetworkCombiner(object):
         self.dfs = []
         self.ids = None
         self.combined = None
+        self.combine = 'prob'
 
     def add_exp(self, exp):
         self.exps.append(exp)
@@ -57,11 +58,11 @@ class NetworkCombiner(object):
         freq = np.mean(all_adj, axis=0)
         return freq
 
-    def desi_f(self, freq, prob):
+    def desi_f(self, freq, prob, w_freq=0.5, w_prob=1):
         """
         weights are hardcoded to 2 as 1:1 can be changed later
         """
-        return np.exp((1 * np.log(freq) + 1 * np.log(prob)) / 2)
+        return np.exp((w_freq * np.log(freq) + w_prob * np.log(prob)) / (w_freq + w_prob))
 
     def adj_matrix_multi(self):
         """
@@ -75,12 +76,23 @@ class NetworkCombiner(object):
             adj = nx.adjacency_matrix(G, nodelist=self.ids, weight="weight")
             all_adj.append(adj.todense())
             n += 1
-        # adj matrix with max prob (no filter)
-        self.adj_matrx = np.maximum.reduce(all_adj)
-
+        if self.combine == 'prob':
+            # adj matrix with max prob (no filter)
+            self.adj_matrx = np.maximum.reduce(all_adj)
+        elif self.combine == 'combined':
+            # now multiply probabilities
+            self.adj_matrx = all_adj.pop()
+            for m1 in all_adj:
+                self.adj_matrx = np.multiply(self.adj_matrx, m1)
+                # self.adj_matrx = np.add(self.adj_matrx, m1)
+        elif self.combine == 'mean':
+            self.adj_matrx = all_adj.pop()
+            for m1 in all_adj:
+                self.adj_matrx = np.add(self.adj_matrx, m1)
+            self.adj_matrx / (len(all_adj) + 1)
         # calculate frequency
-        freq = self.calc_freq(all_adj)
-        self.adj_matrx = self.desi_f(freq, self.adj_matrx)
+        # freq = self.calc_freq(all_adj)
+        # self.adj_matrx = self.desi_f(freq, self.adj_matrx)
         return self.adj_matrx
 
     def to_adj_lst(self):
@@ -104,7 +116,7 @@ class NetworkCombiner(object):
 
     def multi_collapse(self):
         """
-        this is not self.adj_matrix!!!
+        this is not self.adj_matrix
         """
         self.combined = reduce(
             lambda x, y: pd.merge(x, y, on=["ProtA", "ProtB"], how="outer"), self.dfs
@@ -171,6 +183,10 @@ class TableConverter(object):
             np.savetxt(nm, self.adj, delimiter="\t")
         return True
 
+    def fdr_control(self, q=0.05):
+        print(self.df)
+        assert False
+
     def get_adj_matrx(self):
         return self.adj
 
@@ -178,7 +194,7 @@ class TableConverter(object):
         return self.df
 
 
-def fully_connected(l, w=10 ** -17):
+def fully_connected(l, w=10**-17):
     G = nx.Graph()
     [G.add_edge(u, q, weight=w) for u, q in itertools.combinations(l, 2)]
     return G
@@ -201,7 +217,7 @@ def reshape_df(subs):
         col = 'ProtB'
     else:
         col = 'ProtA'
-    inter = list(subs[col])
+    inter = list(set(subs[col]))
     if len(inter) > 0:
         return pd.Series([",".join(inter), int(len(inter))])
 
@@ -230,6 +246,7 @@ def runner(tmp_, ids, outf, crapome):
         raw_matrix = os.path.join(smpl, "transf_matrix.txt")
         allids.extend(list(pd.read_csv(raw_matrix, sep="\t")["ID"]))
         exp = TableConverter(name=exp_info[base], table=pred_out, cond=pred_out)
+        exp.fdr_control()
         exp.convert_to_network()
         exp.weight_adj_matrx(smpl, write=True)
         allexps.add_exp(exp)
@@ -247,8 +264,7 @@ def runner(tmp_, ids, outf, crapome):
     # outfile = allexps.multi_collapse()
     outfile = allexps.to_adj_lst()
     # outfile.reset_index(inplace=True)
-    print(outfile, outfile.shape)
-    assert False
+    outfile.rename(columns={'WD': 'CombProb'}, inplace=True)
     outfile['confidence'] = outfile.apply(label_inte, axis=1)
     crap = io.read_crap(crapome)
     outfile['Frequency_crapome_ProtA'] = outfile['ProtA'].map(crap)
@@ -270,5 +286,6 @@ def runner(tmp_, ids, outf, crapome):
     reshaped2 = outfile.groupby(['ProtB']).apply(reshape_df).reset_index()
     reshaped2.columns = ['Protein', 'interactors', '# interactors']
     reshaped = pd.concat([reshaped, reshaped2]).dropna().drop_duplicates()
+    reshaped = reshaped[reshaped['Protein'] != reshaped['interactors']]
     outname2 = os.path.join(outf, "prot_centr.txt")
     reshaped.to_csv(os.path.join(outname2), sep="\t", index=False)

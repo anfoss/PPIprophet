@@ -106,8 +106,10 @@ def main():
     combine.runner(
                 tmp_=config['GLOBAL']['temp'],
                 ids=config['GLOBAL']['sid'],
-                outf=config['GLOBAL']['out']
+                outf=config['GLOBAL']['out'],
+                crapome=config['GLOBAL']['crapome']
                 )
+    assert False
     score.runner(
                 outf=config['GLOBAL']['out'],
                 tmp_=config['GLOBAL']['temp'],
