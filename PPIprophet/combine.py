@@ -10,6 +10,7 @@ import pickle
 import pandas as pd
 import numpy as np
 import networkx as nx
+import seaborn as sns
 
 
 from PPIprophet import io_ as io
@@ -183,9 +184,115 @@ class TableConverter(object):
             np.savetxt(nm, self.adj, delimiter="\t")
         return True
 
-    def fdr_control(self, q=0.05):
-        print(self.df)
-        assert False
+    def plot_fdr(self, target, decoy, cutoff, fdr, plotname):
+        """
+
+        """
+        wd = target.flatten()
+        sim = decoy.flatten()
+        plt.figure(figsize=(6, 6))
+        ax1 = plt.subplot(311)
+        binNum = 200
+        dist = np.unique(np.concatenate((wd, sim)))
+        binwidth = (max(dist) - min(dist)) / binNum
+        plt.hist(
+            wd,
+            bins=np.arange(min(dist), max(dist) + binwidth, binwidth),
+            color="r",
+            edgecolor="r",
+            alpha=0.3,
+            label="Target",
+        )
+        plt.hist(
+            sim,
+            bins=np.arange(min(dist), max(dist) + binwidth, binwidth),
+            color="b",
+            edgecolor="b",
+            alpha=0.3,
+            label="Decoy",
+        )
+        plt.axvline(x=cutoff, color="gray", linestyle="--", linewidth=0.5)
+        plt.ylabel("Frequency")
+        box = ax1.get_position()
+        ax1.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+        ax1.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+
+        ax2 = plt.subplot(312, sharex=ax1)
+        plt.plot(fdr["prob"], fdr["target"], "r", label="P[Target>x]")
+        plt.plot(fdr["prob"], fdr["decoy"], "b--", label="P[Decoy>x]")
+        plt.plot(fdr["prob"], fdr["fdr"], "k", label="FDR")
+        plt.axvline(x=cutoff, color="gray", linestyle="--", linewidth=0.5)
+        plt.xlabel("DNN score")
+        plt.ylabel("Probability")
+        plt.legend()
+        box = ax2.get_position()
+        ax2.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+        ax2.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+
+        ax3 = plt.subplot(313)
+        plt.plot(fdr["decoy"], fdr["target"], "k")
+        plt.plot(np.linspace(0,1, 100), np.linspace(0,1,100) , color="gray", linestyle="--", linewidth=0.5)
+        plt.ylabel("True positive rate")
+        plt.xlabel("False positive rate")
+        box = ax3.get_position()
+        ax3.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+
+        plt.tight_layout()
+        plt.savefig(plotname, dpi=800, bbox_inches="tight")
+        plt.close()
+        return True
+
+    def plot_dens(self, df, cutoff, nm):
+        fig, ax = plt.subplots(figsize=(2.5, 2.5), facecolor='white')
+        g = sns.FacetGrid(df, row="isdecoy", hue="isdecoy")
+        g.map(sns.kdeplot,"Prob", fill=True)
+        fig = g.fig
+        plt.axvline(x=cutoff, color="gray", linestyle="--", linewidth=0.5)
+        ax.spines["bottom"].set_color('grey')
+        ax.grid(color="w", alpha=0.5)
+        ax.tick_params(axis='y', which='major', labelsize=9)
+        ax.tick_params(axis='x', which='minor', labelsize=6)
+        ax.tick_params(axis='x', which='major', labelsize=6)
+        ax.spines['right'].set_visible(False)
+        ax.spines['top'].set_visible(False)
+        fig.set_size_inches(5, 5, forward=True)
+        fig.savefig(nm, dpi=800, bbox_inches="tight")
+        plt.close()
+
+
+
+    def fdr_control(self, q=0.5, plot=True):
+        # self.df = self.df[self.df['Prob'] >= 0.5]
+        decoy = self.df[self.df['isdecoy'] == 'DECOY']['Prob'].values
+        target = self.df[self.df['isdecoy'] == 'TARGET']['Prob'].values
+        scores = np.unique(np.concatenate((target, decoy)))
+        scores = np.sort(scores)
+        # initialize empty score array
+        newmin = 1
+        fdr = np.zeros(
+            (scores.shape[0],),
+            dtype=[("target", "f4"), ("decoy", "f4"), ("fdr", "f4"), ("prob", "f4")],
+        )
+        for i in range(0, scores.shape[0]):
+            s = scores[i]
+            nt = np.where(target >= s)[0].shape[0] / target.shape[0]
+            nd = np.where(decoy >= s)[0].shape[0] / decoy.shape[0]
+            if nt == 0 or (nd / nt) > 1.0:
+                fdr[i, ] = (nt, nd, 1.0, s)
+            else:
+                # if the fdr is closer to q newmin is the probability
+                if abs(nd/nt - q) < abs(newmin - q):
+                    # print(abs(nd/nt))
+                    newmin = s
+                fdr[i, ] = (nt, nd, nd / nt,s)
+        if plot:
+            # print(newmin, self.table )
+
+            self.plot_fdr(target, decoy, newmin, fdr, '{}prob.pdf'.format(self.table))
+            self.plot_dens(self.df, newmin, '{}densplot.pdf'.format(self.table))
+        self.df = self.df[self.df['Prob'] >= newmin]
+        return newmin
+
 
     def get_adj_matrx(self):
         return self.adj

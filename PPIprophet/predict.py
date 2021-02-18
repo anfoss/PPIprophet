@@ -33,12 +33,14 @@ def mcc(y_true, y_pred):
 def runner(base, modelname="./PPIprophet/APprophet_dnn_no_width.h5"):
     infile = os.path.join(base, "mp_feat_norm.txt")
     model = tf.keras.models.load_model(modelname, custom_objects={'mcc':mcc})
-    X, memo = io.prepare_feat(infile)
+    X, memo = io.prepare_feat(infile, dropw=['W'])
     yhat_probs = model.predict(X, verbose=0)
     df = pd.DataFrame(np.column_stack([memo, yhat_probs]), columns=["protS", "Prob"])
     df["ProtA"], df["ProtB"] = df["protS"].str.split("#", 1).str
+    isdecoy = ['DECOY' if '_DECOY' in x else 'TARGET' for x in df['ProtA']]
+    df['isdecoy'] = isdecoy
     pred_path = os.path.join(base, "dnn.txt")
     df.drop("protS", inplace=True, axis=1)
-    df = df[["ProtA", "ProtB", "Prob"]]
+    df = df[["ProtA", "ProtB", "Prob", 'isdecoy']]
     print(df[df['Prob']>0.5].shape[0], df.shape[0])
     df.to_csv(pred_path, sep="\t", index=False)

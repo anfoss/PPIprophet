@@ -122,23 +122,31 @@ def gen_pairs(prot, decoy=True, pow=6, thres=0.2):
     pairs = list(itertools.combinations(list(prot.keys()), 2))
     ppi = []
     idx = 0
+    lookup = []
     for p in pairs:
         tmp = np.corrcoef(prot[p[0]], prot[p[1]])[0][-1]
         # wgna style
-        if tmp > 0 and tmp**pow > thres:
+        if tmp > thres:
             l1 = ",".join(map(str, prot[p[0]]))
             l2 = ",".join(map(str, prot[p[1]]))
             row = "#".join([l1, l2])
             nm = "ppi_" + str(idx)
-            ppi.append("\t".join([nm, "#".join(p), row]))
-            # pick random protein pairs as decoy ppi
+            ids = "#".join(sorted(p))
+            ppi.append("\t".join([nm, ids, row]))
+            lookup.append(ids)
+            idx += 1
+    if decoy:
+        for x in range(0, len(ppi)):
             dec = random.choice(pairs)
+            while "#".join(sorted(dec)) in lookup:
+                dec = random.choice(pairs)
             l1 = ",".join(map(str, prot[dec[0]]))
             l2 = ",".join(map(str, prot[dec[1]]))
             row = "#".join([l1, l2])
             nm = "DECOY_ppi_" + str(idx)
             ppi.append("\t".join([nm, "#".join([x + '_DECOY' for x in dec]), row]))
-            idx += 1
+            idx+=1
+    print(len(ppi), len(lookup), len(ppi)-len(lookup))
     return ppi
 
 

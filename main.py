@@ -10,7 +10,7 @@ import platform
 # modules
 from PPIprophet import io_ as io
 from PPIprophet import validate_input as validate
-from PPIprophet import generate_features as gen_feat
+from PPIprophet import gen_feat_v3 as gen_feat
 from PPIprophet import predict
 from PPIprophet import preprocess
 from PPIprophet import score
@@ -100,9 +100,9 @@ def main():
     for infile in files:
         # validate.InputTester(infile, 'in').test_file()
         tmp_folder = io.file2folder(infile, prefix=config['GLOBAL']['temp'])
-        preprocess.runner(infile)
-        gen_feat.runner(tmp_folder)
-        predict.runner(tmp_folder)
+        # preprocess.runner(infile)
+        # gen_feat.runner(tmp_folder)
+        # predict.runner(tmp_folder)
     combine.runner(
                 tmp_=config['GLOBAL']['temp'],
                 ids=config['GLOBAL']['sid'],

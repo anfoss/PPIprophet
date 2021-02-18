@@ -17,8 +17,8 @@ def makehash(w=dict):
      then directly
      h[1][2]= 3
      useful ONLY for a 2 level hash
-    """
     # return defaultdict(makehash)
+    """
     return defaultdict(w)
 
 
@@ -405,7 +405,7 @@ def explode(df, lst_cols, fill_value="", preserve_index=False):
     return res
 
 
-def prepare_feat(infile, thresh=1, missing=["nan", "na", "", None, "n", "-"]):
+def prepare_feat(infile, thresh=1, missing=["nan", "na", "", None, "n", "-"], dropw=['W', 'SHFT']):
     """
     read infile and split it
     """
@@ -420,7 +420,7 @@ def prepare_feat(infile, thresh=1, missing=["nan", "na", "", None, "n", "-"]):
     feat_num.replace(to_replace=missing, value=np.nan, inplace=True)
     # remove nan
     feat_num = feat_num.astype(np.float64)
-    feat_num.drop(['W'], axis=1, inplace=True)
+    feat_num.drop(dropw, axis=1, inplace=True)
     mask = feat_num.isnull().mean(axis=1) <= thresh
     feat_num = feat_num[mask].fillna(0)
     return feat_num.values, memos[mask].values
