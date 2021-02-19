@@ -314,11 +314,9 @@ def runner(tmp_, ids, outf, crapome):
 
     G2 = gr_graphs.pop()
     for g in gr_graphs:
-        G2 = nx.compose(G2, G)
-    print(len(G2.nodes))
+        G2 = nx.compose(G2, g)
     allids = sorted(list(set(allids)))
     alladj = nx.adjacency_matrix(G2, nodelist=allids, weight="weight").todense()
-    print(alladj.shape)
     np.savetxt(os.path.join(tmp_, "adj_mult.csv"), alladj, delimiter=",")
     with open(os.path.join(tmp_, "ids.pkl"), "wb") as f:
         pickle.dump(allids, f)

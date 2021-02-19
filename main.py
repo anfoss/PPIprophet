@@ -103,12 +103,12 @@ def main():
         # preprocess.runner(infile)
         # gen_feat.runner(tmp_folder)
         # predict.runner(tmp_folder)
-    combine.runner(
-                tmp_=config['GLOBAL']['temp'],
-                ids=config['GLOBAL']['sid'],
-                outf=config['GLOBAL']['out'],
-                crapome=config['GLOBAL']['crapome']
-                )
+    # combine.runner(
+    #             tmp_=config['GLOBAL']['temp'],
+    #             ids=config['GLOBAL']['sid'],
+    #             outf=config['GLOBAL']['out'],
+    #             crapome=config['GLOBAL']['crapome']
+    #             )
     score.runner(
                 outf=config['GLOBAL']['out'],
                 tmp_=config['GLOBAL']['temp'],

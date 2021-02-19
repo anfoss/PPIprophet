@@ -276,27 +276,36 @@ def runner(tmp_, outf, crapome, thresh):
     with open(os.path.join(tmp_, "ids.pkl"), "rb") as f:
         ids = pickle.load(f)
     # print('calculating wd score\n')
-    m, ids = filter_crap(m, ids, crapome, thresh)
+    # m, ids = filter_crap(m, ids, crapome, thresh)
     m, ids = preprocess_matrix(m, ids)
-    wd = calc_wd_matrix(m, iteration=10000, q=0.9, norm=False, plot=False)
-    wd_ls = to_adj_lst(wd)
-    df = pd.DataFrame(wd_ls)
-    ids_d = dict(zip(range(0, len(ids)), ids))
-    df.columns = ["ProtA", "ProtB", "WD"]
-    df["ProtA"] = df["ProtA"].map(ids_d)
-    df["ProtB"] = df["ProtB"].map(ids_d)
-    df.to_csv(os.path.join(outf, "d_scores.txt"), sep="\t", index=False)
-    # now we need to filter m
-    m[wd==0] = 0
-    assert False
-    m, ids = preprocess_matrix(m, ids)
-    clusters = rec_mcl(m)
-    output_from_clusters(ids, clusters, outf)
-    spl = karateclub.EgoNetSplitter(10)
+    # wd = calc_wd_matrix(m, iteration=10000, q=0.9, norm=False, plot=False)
+    # wd_ls = to_adj_lst(wd)
+    # df = pd.DataFrame(wd_ls)
+    # ids_d = dict(zip(range(0, len(ids)), ids))
+    # df.columns = ["ProtA", "ProtB", "WD"]
+    # df["ProtA"] = df["ProtA"].map(ids_d)
+    # df["ProtB"] = df["ProtB"].map(ids_d)
+    # df.to_csv(os.path.join(outf, "d_scores.txt"), sep="\t", index=False)
+    # # now we need to filter m
+    #
+    # m, ids = preprocess_matrix(m, ids)
+    # clusters = rec_mcl(m)
+    # output_from_clusters(ids, clusters, outf)
+    m[m==0]=10**-17
+    G = nx.from_numpy_matrix(m)
+    # G = nx.relabel_nodes(G,dict(zip(G.nodes, ids)))
+    numeric_indices = [index for index in range(G.number_of_nodes())]
+    node_indices = sorted([node for node in G.nodes()])
+    # substitute 0 with small nr?
+    # print(G.edges(data=True))
+    # assert False
+    spl = karateclub.EgoNetSplitter(20)
     spl.fit(nx.from_numpy_matrix(m))
     out = {}
     ids_d = dict(zip(range(0, len(ids)), ids))
     for k, v in spl.get_memberships().items():
+        prit(k,v)
+        continue
         for cl_id in v:
             if out.get(cl_id):
                 out[cl_id].append(ids_d[k])
