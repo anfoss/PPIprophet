@@ -279,7 +279,6 @@ def summary_err_table(df, qvalues=[0, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5]
 
 
 def error_statistics(target_scores, decoy_scores, parametric=False, pfdr=0.1, pi0_lambda=False, pi0_method = "smoother", pi0_smooth_df = 3, pi0_smooth_log_pi0 = False, compute_lfdr = True, lfdr_trunc = True, lfdr_monotone = True, lfdr_transf = "probit", lfdr_adj = 1.5, lfdr_eps = np.power(10.0,-8)):
-    """ Takes list of decoy and target scores and creates error statistics for target values """
 
     target_scores = np.sort(target_scores[~np.isnan(target_scores)])
     decoy_scores = np.sort(decoy_scores[~np.isnan(decoy_scores)])

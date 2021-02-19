@@ -18,6 +18,7 @@ from PPIprophet import qvalue as qvalue
 
 
 
+
 class NetworkCombiner(object):
     """
     Combine all replicates for a single condition into a network
@@ -32,7 +33,7 @@ class NetworkCombiner(object):
         self.dfs = []
         self.ids = None
         self.combined = None
-        self.combine = 'mean'
+        self.combine = 'combined'
 
     def add_exp(self, exp):
         self.exps.append(exp)
@@ -94,7 +95,6 @@ class NetworkCombiner(object):
             for m1 in all_adj:
                 self.adj_matrx = np.add(self.adj_matrx, m1)
             self.adj_matrx = self.adj_matrx / (len(all_adj) + 1)
-        print(np.min(self.adj_matrx), np.max(self.adj_matrx), len(all_adj)+1)
         # calculate frequency
         # freq = self.calc_freq(all_adj)
         # self.adj_matrx = self.desi_f(freq, self.adj_matrx)
@@ -141,9 +141,8 @@ class NetworkCombiner(object):
 class TableConverter(object):
     """docstring for TableConverter"""
 
-    def __init__(self, name, table, cond):
+    def __init__(self, table, cond):
         super(TableConverter, self).__init__()
-        self.name = name
         self.table = table
         self.df = pd.read_csv(table, sep="\t")
         self.cond = cond
@@ -237,46 +236,10 @@ def reshape_df(subs):
     if len(inter) > 0:
         return pd.Series([",".join(inter), int(len(inter))])
 
-
-def runner(tmp_, ids, outf, crapome):
-    """
-    read folder tmp in directory.
-    then loop for each file and create a combined file which contains all files
-    creates in the tmp directory
-    """
-    if not os.path.isdir(outf):
-        os.makedirs(outf)
-    dir_ = []
-    dir_ = [x[0] for x in os.walk(tmp_) if x[0] is not tmp_]
-    exp_info = io.read_sample_ids(ids)
-    strip = lambda x: os.path.splitext(os.path.basename(x))[0]
-    exp_info = {strip(k): v for k, v in exp_info.items()}
-    allexps = NetworkCombiner()
-    allids = []
-    for smpl in dir_:
-        base = os.path.basename(os.path.normpath(smpl))
-        if not exp_info.get(base, None):
-            continue
-        # print(base, exp_info[base])
-        pred_out = os.path.join(smpl, "dnn.txt")
-        raw_matrix = os.path.join(smpl, "transf_matrix.txt")
-        allids.extend(list(pd.read_csv(raw_matrix, sep="\t")["ID"]))
-        exp = TableConverter(name=exp_info[base], table=pred_out, cond=pred_out)
-        exp.fdr_control()
-        exp.convert_to_network()
-        exp.weight_adj_matrx(smpl, write=True)
-        allexps.add_exp(exp)
-    allexps.create_dfs()
-    allexps.combine_graphs(allids)
-    m_adj = allexps.adj_matrix_multi()
-    # for score.py
-    np.savetxt(os.path.join(tmp_, "adj_mult.csv"), m_adj, delimiter=",")
-    ids = allexps.get_ids()
-    with open(os.path.join(tmp_, "ids.pkl"), "wb") as f:
-        pickle.dump(ids, f)
+def gen_output(outf, group, allexps, crapome):
 
     # protA protB format
-    outname = os.path.join(outf, "adj_list.txt")
+    outname = os.path.join(outf, "adj_list_{}.txt".format(group))
     # outfile = allexps.multi_collapse()
     outfile = allexps.to_adj_lst()
     # outfile.reset_index(inplace=True)
@@ -302,5 +265,45 @@ def runner(tmp_, ids, outf, crapome):
     reshaped2.columns = ['Protein', 'interactors', '# interactors']
     reshaped = pd.concat([reshaped, reshaped2]).dropna().drop_duplicates()
     reshaped = reshaped[reshaped['Protein'] != reshaped['interactors']]
-    outname2 = os.path.join(outf, "prot_centr.txt")
+    outname2 = os.path.join(outf, "prot_centr_{}.txt".format(group))
     reshaped.to_csv(os.path.join(outname2), sep="\t", index=False)
+
+
+def runner(tmp_, ids, outf, crapome):
+    """
+    read folder tmp in directory.
+    then loop for each file and create a combined file which contains all files
+    creates in the tmp directory
+    """
+    if not os.path.isdir(outf):
+        os.makedirs(outf)
+    dir_ = []
+    dir_ = [x[0] for x in os.walk(tmp_) if x[0] is not tmp_]
+    exp_info = pd.read_csv(ids, sep="\t")
+    strip = lambda x: os.path.splitext(os.path.basename(x))[0]
+    groups = dict(zip(exp_info['group'], exp_info['short_id']))
+    for k, v in groups.items():
+        allexps = NetworkCombiner()
+        allids = []
+        group_info = exp_info[exp_info['group']==k]
+        for smpl in dir_:
+            base = os.path.basename(os.path.normpath(smpl))
+            fl = "./Input/{}.txt".format(base)
+            if not group_info['Sample'].str.contains(fl).any():
+                continue
+            pred_out = os.path.join(smpl, "dnn.txt")
+            raw_matrix = os.path.join(smpl, "transf_matrix.txt")
+            allids.extend(list(pd.read_csv(raw_matrix, sep="\t")["ID"]))
+            exp = TableConverter(table=pred_out, cond=pred_out)
+            exp.fdr_control()
+            exp.convert_to_network()
+            exp.weight_adj_matrx(smpl, write=True)
+            allexps.add_exp(exp)
+        allexps.create_dfs()
+        allexps.combine_graphs(allids)
+        m_adj = allexps.adj_matrix_multi()
+        np.savetxt(os.path.join(tmp_, "adj_mult.csv"), m_adj, delimiter=",")
+        ids = allexps.get_ids()
+        with open(os.path.join(tmp_, "ids.pkl"), "wb") as f:
+            pickle.dump(ids, f)
+        gen_output(outf, v, allexps, crapome)
