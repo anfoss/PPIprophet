@@ -100,7 +100,6 @@ class NetworkCombiner(object):
         # self.adj_matrx = self.desi_f(freq, self.adj_matrx)
         return self.adj_matrx
 
-
     def to_adj_lst(self):
         """
         converts adjacency matrix to adj list
@@ -117,7 +116,6 @@ class NetworkCombiner(object):
         df["ProtB"] = df["ProtB"].map(ids_d)
         df = df[df['CombProb'] >= 0.5]
         return df
-
 
     def multi_collapse(self):
         """
@@ -136,6 +134,15 @@ class NetworkCombiner(object):
 
     def get_adj(self):
         return self.adj_matrx
+
+    def get_gr_network(self):
+        """
+        convert self.adj_matrx to network using node ids
+        """
+        G = nx.from_numpy_matrix(self.adj_matrx)
+        G =nx.relabel_nodes(G,dict(zip(G.nodes, self.ids)))
+        return G
+
 
 
 class TableConverter(object):
@@ -188,7 +195,7 @@ class TableConverter(object):
         return True
 
 
-    def fdr_control(self, fdr_cutoff=0.5, plot=True):
+    def fdr_control(self, fdr_cutoff=0.75, plot=True):
         self.df = self.df[self.df['Prob'] >= 0.5]
         decoy = self.df[self.df['isdecoy'] == 'DECOY']['Prob'].values
         target = self.df[self.df['isdecoy'] == 'TARGET']['Prob'].values
@@ -236,12 +243,12 @@ def reshape_df(subs):
     if len(inter) > 0:
         return pd.Series([",".join(inter), int(len(inter))])
 
-def gen_output(outf, group, allexps, crapome):
+def gen_output(outf, group, exps, crapome):
 
     # protA protB format
     outname = os.path.join(outf, "adj_list_{}.txt".format(group))
-    # outfile = allexps.multi_collapse()
-    outfile = allexps.to_adj_lst()
+    # outfile = gr_exps.multi_collapse()
+    outfile = exps.to_adj_lst()
     # outfile.reset_index(inplace=True)
     outfile['confidence'] = outfile.apply(label_inte, axis=1)
     crap = io.read_crap(crapome)
@@ -249,16 +256,6 @@ def gen_output(outf, group, allexps, crapome):
     outfile['Frequency_crapome_ProtB'] = outfile['ProtB'].map(crap)
     outfile.fillna(0, inplace=True)
     outfile.to_csv(os.path.join(outname), sep="\t", index=False)
-    # adj matrix
-    # m_adj = pd.DataFrame(m_adj, index=ids)
-    # m_adj.columns = ids
-    # m_adj.to_csv(os.path.join(outf, 'adj_matrix_combined.txt'), sep="\t")
-    # TODO fix here all bool f
-    #  mask = outfile['ProtA'].values == outfile['ProtB'].values
-    # print(outfile)
-    # outfile = outfile[~mask]
-    # print(list(set(mask)))
-    # assert False
     reshaped = outfile.groupby(['ProtA']).apply(reshape_df).reset_index()
     reshaped.columns = ['Protein', 'interactors', '# interactors']
     reshaped2 = outfile.groupby(['ProtB']).apply(reshape_df).reset_index()
@@ -268,6 +265,12 @@ def gen_output(outf, group, allexps, crapome):
     outname2 = os.path.join(outf, "prot_centr_{}.txt".format(group))
     reshaped.to_csv(os.path.join(outname2), sep="\t", index=False)
 
+
+def estimate_background():
+    """
+    estimated background from crapome
+    """
+    pass
 
 def runner(tmp_, ids, outf, crapome):
     """
@@ -282,9 +285,11 @@ def runner(tmp_, ids, outf, crapome):
     exp_info = pd.read_csv(ids, sep="\t")
     strip = lambda x: os.path.splitext(os.path.basename(x))[0]
     groups = dict(zip(exp_info['group'], exp_info['short_id']))
+    allids = []
+    gr_graphs = []
     for k, v in groups.items():
-        allexps = NetworkCombiner()
-        allids = []
+        gr_exps = NetworkCombiner()
+        grids = []
         group_info = exp_info[exp_info['group']==k]
         for smpl in dir_:
             base = os.path.basename(os.path.normpath(smpl))
@@ -293,17 +298,27 @@ def runner(tmp_, ids, outf, crapome):
                 continue
             pred_out = os.path.join(smpl, "dnn.txt")
             raw_matrix = os.path.join(smpl, "transf_matrix.txt")
-            allids.extend(list(pd.read_csv(raw_matrix, sep="\t")["ID"]))
+            grids.extend(list(pd.read_csv(raw_matrix, sep="\t")["ID"]))
             exp = TableConverter(table=pred_out, cond=pred_out)
             exp.fdr_control()
             exp.convert_to_network()
             exp.weight_adj_matrx(smpl, write=True)
-            allexps.add_exp(exp)
-        allexps.create_dfs()
-        allexps.combine_graphs(allids)
-        m_adj = allexps.adj_matrix_multi()
-        np.savetxt(os.path.join(tmp_, "adj_mult.csv"), m_adj, delimiter=",")
-        ids = allexps.get_ids()
-        with open(os.path.join(tmp_, "ids.pkl"), "wb") as f:
-            pickle.dump(ids, f)
-        gen_output(outf, v, allexps, crapome)
+            gr_exps.add_exp(exp)
+        gr_exps.create_dfs()
+        gr_exps.combine_graphs(grids)
+        gr_exps.adj_matrix_multi()
+        # group specific graph
+        gr_graphs.append(gr_exps.get_gr_network())
+        gen_output(outf, v, gr_exps, crapome)
+        allids.extend(grids)
+
+    G2 = gr_graphs.pop()
+    for g in gr_graphs:
+        G2 = nx.compose(G2, G)
+    print(len(G2.nodes))
+    allids = sorted(list(set(allids)))
+    alladj = nx.adjacency_matrix(G2, nodelist=allids, weight="weight").todense()
+    print(alladj.shape)
+    np.savetxt(os.path.join(tmp_, "adj_mult.csv"), alladj, delimiter=",")
+    with open(os.path.join(tmp_, "ids.pkl"), "wb") as f:
+        pickle.dump(allids, f)

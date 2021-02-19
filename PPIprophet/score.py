@@ -278,7 +278,7 @@ def runner(tmp_, outf, crapome, thresh):
     # print('calculating wd score\n')
     m, ids = filter_crap(m, ids, crapome, thresh)
     m, ids = preprocess_matrix(m, ids)
-    wd = calc_wd_matrix(m, iteration=10000, q=0.30, norm=False, plot=False)
+    wd = calc_wd_matrix(m, iteration=10000, q=0.9, norm=False, plot=False)
     wd_ls = to_adj_lst(wd)
     df = pd.DataFrame(wd_ls)
     ids_d = dict(zip(range(0, len(ids)), ids))
