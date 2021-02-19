@@ -299,13 +299,11 @@ def runner(tmp_, outf, crapome, thresh):
     # substitute 0 with small nr?
     # print(G.edges(data=True))
     # assert False
-    spl = karateclub.EgoNetSplitter(20)
+    spl = karateclub.EgoNetSplitter(100)
     spl.fit(nx.from_numpy_matrix(m))
     out = {}
     ids_d = dict(zip(range(0, len(ids)), ids))
     for k, v in spl.get_memberships().items():
-        prit(k,v)
-        continue
         for cl_id in v:
             if out.get(cl_id):
                 out[cl_id].append(ids_d[k])

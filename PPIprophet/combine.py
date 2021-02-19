@@ -313,8 +313,22 @@ def runner(tmp_, ids, outf, crapome):
         allids.extend(grids)
 
     G2 = gr_graphs.pop()
+    mx = 0
     for g in gr_graphs:
-        G2 = nx.compose(G2, g)
+        for a,b, attrs in g.edges(data=True):
+            if G2.has_edge(a,b):
+                if G2[a][b]['weight'] < attrs['weight']:
+                    G2[a][b]['weight'] = attrs['weight']
+
+            else:
+                G2.add_edge(a,b, weight=attrs['weight'])
+    # filter weights
+    G3 = nx.Graph()
+    tokeep = [(a,b, attrs) for a, b, attrs in G2.edges(data=True) if attrs["weight"] >= 0.5]
+    G3.add_weighted_edges_from(tokeep)
+    # print(tokeep)
+    # print(len(G3.nodes), len(G3.edges), len(G2.nodes), len(G2.edges))
+    nx.write_graphml(G=G2,path=os.path.join(tmp_, "comb_graph.graphml"))
     allids = sorted(list(set(allids)))
     alladj = nx.adjacency_matrix(G2, nodelist=allids, weight="weight").todense()
     np.savetxt(os.path.join(tmp_, "adj_mult.csv"), alladj, delimiter=",")
