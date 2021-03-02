@@ -33,7 +33,8 @@ class NetworkCombiner(object):
         self.dfs = []
         self.ids = None
         self.combined = None
-        self.combine = 'combined'
+        self.combine = 'mean'
+        self.comb_net = None
 
     def add_exp(self, exp):
         self.exps.append(exp)
@@ -84,7 +85,7 @@ class NetworkCombiner(object):
         if self.combine == 'prob':
             # adj matrix with max prob (no filter)
             self.adj_matrx = np.maximum.reduce(all_adj)
-        elif self.combine == 'combined':
+        elif self.combine == 'comb':
             # now multiply probabilities
             self.adj_matrx = all_adj.pop()
             for m1 in all_adj:
@@ -98,22 +99,19 @@ class NetworkCombiner(object):
         # calculate frequency
         # freq = self.calc_freq(all_adj)
         # self.adj_matrx = self.desi_f(freq, self.adj_matrx)
+        # convert to network and return
+        # nodes are alphabetically ordered
+        self.comb_net = nx.from_numpy_matrix(self.adj_matrx)
+        self.comb_net = nx.relabel_nodes(self.comb_net, dict(zip(self.comb_net.nodes, self.ids), copy=False))
         return self.adj_matrx
 
     def to_adj_lst(self):
         """
         converts adjacency matrix to adj list
         """
-        idx = np.triu_indices(n=self.adj_matrx.shape[0])
-        v = self.adj_matrx[idx].reshape(-1, 1)
-        col = idx[0].reshape(-1, 1)
-        row = idx[1].reshape(-1, 1)
-        final = np.concatenate((row, col, v), axis=1)
-        ids_d = dict(zip(range(0, len(self.ids)), self.ids))
-        df = pd.DataFrame(final)
+        df = nx.to_pandas_edgelist(self.comb_net)
         df.columns = ["ProtA", "ProtB", "CombProb"]
-        df["ProtA"] = df["ProtA"].map(ids_d)
-        df["ProtB"] = df["ProtB"].map(ids_d)
+        df = df[df['ProtA'] != df['ProtB']]
         df = df[df['CombProb'] >= 0.5]
         return df
 
@@ -140,7 +138,7 @@ class NetworkCombiner(object):
         convert self.adj_matrx to network using node ids
         """
         G = nx.from_numpy_matrix(self.adj_matrx)
-        G =nx.relabel_nodes(G,dict(zip(G.nodes, self.ids)))
+        G = nx.relabel_nodes(G,dict(zip(G.nodes, self.ids)))
         return G
 
 
@@ -195,7 +193,7 @@ class TableConverter(object):
         return True
 
 
-    def fdr_control(self, fdr_cutoff=0.75, plot=True):
+    def fdr_control(self, fdr_cutoff=0.5, plot=True):
         self.df = self.df[self.df['Prob'] >= 0.5]
         decoy = self.df[self.df['isdecoy'] == 'DECOY']['Prob'].values
         target = self.df[self.df['isdecoy'] == 'TARGET']['Prob'].values
@@ -233,16 +231,6 @@ def label_inte(subs):
         return 'No interaction'
 
 
-def reshape_df(subs):
-    subs = subs[subs['CombProb'] >= 0.5]
-    if 'ProtB' in subs.columns:
-        col = 'ProtB'
-    else:
-        col = 'ProtA'
-    inter = list(set(subs[col]))
-    if len(inter) > 0:
-        return pd.Series([",".join(inter), int(len(inter))])
-
 def gen_output(outf, group, exps, crapome):
 
     # protA protB format
@@ -256,13 +244,19 @@ def gen_output(outf, group, exps, crapome):
     outfile['Frequency_crapome_ProtB'] = outfile['ProtB'].map(crap)
     outfile.fillna(0, inplace=True)
     outfile.to_csv(os.path.join(outname), sep="\t", index=False)
-    reshaped = outfile.groupby(['ProtA']).apply(reshape_df).reset_index()
+
+    # prot centric output
+    G = nx.from_pandas_edgelist(outfile, 'ProtA', 'ProtB')
+    k = {}
+    for node in G.nodes():
+        tmp =  list(G.neighbors(node))
+        k[node] = [", ".join(tmp), len(tmp)]
+    reshaped = pd.DataFrame.from_dict(k, orient='index')
+    reshaped.reset_index(inplace=True)
     reshaped.columns = ['Protein', 'interactors', '# interactors']
-    reshaped2 = outfile.groupby(['ProtB']).apply(reshape_df).reset_index()
-    reshaped2.columns = ['Protein', 'interactors', '# interactors']
-    reshaped = pd.concat([reshaped, reshaped2]).dropna().drop_duplicates()
     reshaped = reshaped[reshaped['Protein'] != reshaped['interactors']]
     outname2 = os.path.join(outf, "prot_centr_{}.txt".format(group))
+    reshaped.sort_values(by=['Protein'], inplace=True)
     reshaped.to_csv(os.path.join(outname2), sep="\t", index=False)
 
 
@@ -271,6 +265,7 @@ def estimate_background():
     estimated background from crapome
     """
     pass
+
 
 def runner(tmp_, ids, outf, crapome):
     """
@@ -324,13 +319,13 @@ def runner(tmp_, ids, outf, crapome):
                 G2.add_edge(a,b, weight=attrs['weight'])
     # filter weights
     G3 = nx.Graph()
-    tokeep = [(a,b, attrs) for a, b, attrs in G2.edges(data=True) if attrs["weight"] >= 0.5]
+    tokeep = [(a,b, attrs['weight']) for a, b, attrs in G2.edges(data=True) if attrs["weight"] >= 0.5]
     G3.add_weighted_edges_from(tokeep)
-    # print(tokeep)
-    # print(len(G3.nodes), len(G3.edges), len(G2.nodes), len(G2.edges))
-    nx.write_graphml(G=G2,path=os.path.join(tmp_, "comb_graph.graphml"))
-    allids = sorted(list(set(allids)))
-    alladj = nx.adjacency_matrix(G2, nodelist=allids, weight="weight").todense()
+    todf = [[a,b,attr['weight']] for a,b,attr in G3.edges(data=True)]
+    df = pd.DataFrame(todf, columns=['ProtA', 'ProtB', 'weight'])
+    df.to_csv(os.path.join(tmp_, "comb_graph_adj.txt"),sep="\t")
+    allids = sorted(list(set(G3.nodes)))
+    alladj = nx.adjacency_matrix(G3, nodelist=allids, weight="weight").todense()
     np.savetxt(os.path.join(tmp_, "adj_mult.csv"), alladj, delimiter=",")
     with open(os.path.join(tmp_, "ids.pkl"), "wb") as f:
         pickle.dump(allids, f)

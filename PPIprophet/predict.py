@@ -7,6 +7,7 @@ import pandas as pd
 import tensorflow as tf
 from tensorflow.keras import backend as K
 import joblib
+import re
 
 from PPIprophet import io_ as io
 
@@ -29,7 +30,7 @@ def mcc(y_true, y_pred):
     denominator = K.sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn))
     return numerator / (denominator + K.epsilon())
 
-#
+
 def runner(base, modelname="./PPIprophet/APprophet_dnn_no_width.h5"):
     infile = os.path.join(base, "mp_feat_norm.txt")
     model = tf.keras.models.load_model(modelname, custom_objects={'mcc':mcc})
@@ -42,5 +43,8 @@ def runner(base, modelname="./PPIprophet/APprophet_dnn_no_width.h5"):
     pred_path = os.path.join(base, "dnn.txt")
     df.drop("protS", inplace=True, axis=1)
     df = df[["ProtA", "ProtB", "Prob", 'isdecoy']]
+    # cleanup string to remove _p_0 from middle
+    df['ProtA'] = [re.sub("_p_.","",x) for x in df['ProtA']]
+    df['ProtB'] = [re.sub("_p_.","",x) for x in df['ProtB']]
     print(df[df['Prob']>0.5].shape[0], df.shape[0])
     df.to_csv(pred_path, sep="\t", index=False)
