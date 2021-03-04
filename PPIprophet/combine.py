@@ -193,7 +193,7 @@ class TableConverter(object):
         return True
 
 
-    def fdr_control(self, fdr_cutoff=0.5, plot=True):
+    def fdr_control(self, fdr_cutoff=0.75, plot=True):
         self.df = self.df[self.df['Prob'] >= 0.5]
         decoy = self.df[self.df['isdecoy'] == 'DECOY']['Prob'].values
         target = self.df[self.df['isdecoy'] == 'TARGET']['Prob'].values

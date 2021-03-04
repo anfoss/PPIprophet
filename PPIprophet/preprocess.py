@@ -10,7 +10,7 @@ import PPIprophet.stats_ as st
 
 
 # standardize and center methods
-def center_arr(hoa, fr_nr="all", smooth=False, stretch=(True, 72)):
+def center_arr(hoa, fr_nr="all", smooth=True, stretch=(True, 72)):
     norm = {}
     for k in hoa:
         key = hoa[k]
@@ -25,13 +25,13 @@ def center_arr(hoa, fr_nr="all", smooth=False, stretch=(True, 72)):
         if stretch[0]:
             # input original length wanted length
             key = st.resample(key, len(key), output_fr=stretch[1])
-        key = als(key)
+        # key = als(key)
         key = st.resize(key)
         norm[k] = list(key)
     return norm
 
 
-def als(y, lam=10, p=0.5, niter=100, pl=False, fr=75):
+def als(y, lam=10, p=0.5, niter=100, pl=False, fr=72):
     """
     p for asymmetry and λ for smoothness.
     generally 0.001 ≤ p ≤ 0.1
@@ -113,7 +113,7 @@ def zero_sequence(arr):
         idx += 1
 
 
-def gen_pairs(prot, decoy=True, pow=6, thres=0.2):
+def gen_pairs(prot, decoy=True, pow=6, thres=0):
     """
     generate all possible pairs between proteins
     remove self dupl i.e between same protein but different apex
@@ -146,7 +146,6 @@ def gen_pairs(prot, decoy=True, pow=6, thres=0.2):
             nm = "DECOY_ppi_" + str(idx)
             ppi.append("\t".join([nm, "#".join([x + '_DECOY' for x in dec]), row]))
             idx+=1
-    print(len(ppi), len(lookup), len(ppi)-len(lookup))
     return ppi
 
 
