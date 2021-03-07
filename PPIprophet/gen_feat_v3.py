@@ -300,9 +300,9 @@ def format_hash(temp):
     """
     get a row hash and create a ComplexProfile object
     """
-    inten = temp["FT"].split("#")
-    members = temp["MB"].split("#")
-    tmp = ComplexProfile(temp["ID"])
+    inten = temp['FT'].split("#")
+    members = temp['MB'].split("#")
+    tmp = ComplexProfile(temp['ID'])
     for idx, acc in enumerate(members):
         if acc in tmp.get_members():
             continue
