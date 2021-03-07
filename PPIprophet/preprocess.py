@@ -137,6 +137,7 @@ def gen_pairs_vec(prot, decoy=True, pow=6, thres=0.0):
     pos.replace(memo, inplace=True)
     pos['ID'] = np.arange(1,pos.shape[0]+1)
     pos['ID'] = 'ppi_' + pos['ID'].astype(str)
+    pos['MB'] = pos[0] + '#' + pos[1]
     ft_pos = pos.replace(prot2)
     pos['FT'] = ft_pos[0] + '#' + ft_pos[1]
 
@@ -239,5 +240,5 @@ def runner(infile, split=True):
     ppi = gen_pairs_vec(prot2, decoy=True)
     nm = os.path.join(base, "ppi.txt")
     # io.wrout(ppi, nm, ["ID", "MB", "FT"])
-    ppi.to_csv(nm, sep='\t')
+    ppi.to_csv(nm, sep='\t', index=False)
     return True
