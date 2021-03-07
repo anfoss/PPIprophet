@@ -112,7 +112,53 @@ def zero_sequence(arr):
             return tmp + l
         idx += 1
 
+# @io.timeit
+def gen_pairs_vec(prot, decoy=True, pow=6, thres=0.0):
+    import random
 
+    np.random.seed(0)
+    pairs = list(itertools.combinations(list(prot.keys()), 2))
+    ppi = []
+    idx = 0
+    lookup = []
+    arr = []
+    memo = []
+    for p, v in prot.items():
+        memo.append(p)
+        arr.append(v)
+    arr = np.corrcoef(np.array(arr))
+
+    # positive
+    pos = np.column_stack(np.where(arr > thres))
+    pos = pd.DataFrame(pos)
+    prot2 = {k: ",".join(map(str, v)) for k,v in prot.items()}
+    memo = dict(zip(range(len(memo)), memo))
+    pos = pos[pos[0] !=pos[1]]
+    pos.replace(memo, inplace=True)
+    pos['ID'] = np.arange(1,pos.shape[0]+1)
+    pos['ID'] = 'ppi_' + pos['ID'].astype(str)
+    ft_pos = pos.replace(prot2)
+    pos['FT'] = ft_pos[0] + '#' + ft_pos[1]
+
+    # decoys
+    neg = np.column_stack(np.where(arr <= thres))
+    neg = neg[np.random.choice(neg.shape[0], pos.shape[0], replace=False), :]
+    neg = pd.DataFrame(neg)
+    prot2 = {k: ",".join(map(str, v)) for k,v in prot.items()}
+    neg = neg[neg[0] !=neg[1]]
+    neg.replace(memo, inplace=True)
+    neg['ID'] = np.arange(pos.shape[0]+1, neg.shape[0]+pos.shape[0]+1)
+    neg['ID'] = 'DECOY_ppi_' + neg['ID'].astype(str)
+    # now add the features
+    ft_neg = neg.replace(prot2)
+    neg['MB'] = neg[0] +'_DECOY' + '#' + neg[1] + '_DECOY'
+    neg['FT'] = ft_neg[0] + '#' + ft_neg[1]
+    tots = pd.concat([neg,pos])
+    tots.drop([0,1], axis=1, inplace=True)
+    return tots
+
+
+# @io.timeit
 def gen_pairs(prot, decoy=True, pow=6, thres=0):
     """
     generate all possible pairs between proteins
@@ -137,6 +183,7 @@ def gen_pairs(prot, decoy=True, pow=6, thres=0):
             idx += 1
     if decoy:
         for x in range(0, len(ppi)):
+            random.seed(x)
             dec = random.choice(pairs)
             while "#".join(sorted(dec)) in lookup:
                 dec = random.choice(pairs)
@@ -165,23 +212,8 @@ def impute_namean(ls):
     return ls
 
 
-def gen_decoy_ppi(df):
-    """
-    generate a scrambled dataframe from the original one
-    returns a concatenated dataframe
-    add 'decoy' to name
-    """
-    arr = df.values
-    idx = np.random.rand(*arr.shape).argsort(axis=1)
-    # old = np.sum(arr, axis=1)
-    arr = np.take_along_axis(arr, idx, axis=1)
-    # assert np.sum(arr, axis=1) == old
-    pr = [x + '_decoy' for x in list(df.index)]
-    df2 = pd.DataFrame(arr, index=pr)
-    return pd.concat([df, df2])
-
-
-def runner(infile, split=False):
+# used split == False in paper
+def runner(infile, split=True):
     prot = io.read_txt(infile)
     print("preprocessing " + infile)
     # write it for differential stretch it to assert same length
@@ -204,7 +236,8 @@ def runner(infile, split=False):
     # write transf matrix
     dest = os.path.join(base, "transf_matrix.txt")
     pr_df.to_csv(dest, sep="\t", encoding="utf-8", index_label="ID")
-    ppi = gen_pairs(prot2, decoy=True)
+    ppi = gen_pairs_vec(prot2, decoy=True)
     nm = os.path.join(base, "ppi.txt")
-    io.wrout(ppi, nm, ["ID", "MB", "FT"])
+    # io.wrout(ppi, nm, ["ID", "MB", "FT"])
+    ppi.to_csv(nm, sep='\t')
     return True

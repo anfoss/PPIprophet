@@ -11,6 +11,7 @@ import pandas as pd
 import numpy as np
 import networkx as nx
 import seaborn as sns
+from functools import reduce
 
 
 from PPIprophet import io_ as io
@@ -33,6 +34,7 @@ class NetworkCombiner(object):
         self.dfs = []
         self.ids = None
         self.combined = None
+        # used mean for paper
         self.combine = 'mean'
         self.comb_net = None
 
@@ -48,6 +50,19 @@ class NetworkCombiner(object):
         """
         self.networks = [x.fill_graph(ids_all) for x in self.exps]
         return True
+
+    def multi_prob_out(self):
+        """
+        print output in the format of prota and protb with probabilities per file
+        """
+        allprobs = []
+        for G in self.networks:
+            # adj = nx.adjacency_matrix(G, nodelist=self.ids, weight="weight")
+            df = nx.to_pandas_edgelist(G)
+            df = df[df['weight']>=0.5]
+            allprobs.append(df)
+        tots = reduce(lambda l,r: pd.merge(l,r,on=['source', 'target'], how='outer'), allprobs)
+        return tots
 
     def calc_freq(self, all_adj):
         """
@@ -75,13 +90,11 @@ class NetworkCombiner(object):
         need to be done per group
         """
         all_adj = []
-        n = 0
-        # enforce same orderd
+        # enforce same order
         self.ids = sorted(list(map(str, self.networks[0].nodes())))
         for G in self.networks:
             adj = nx.adjacency_matrix(G, nodelist=self.ids, weight="weight")
             all_adj.append(adj.todense())
-            n += 1
         if self.combine == 'prob':
             # adj matrix with max prob (no filter)
             self.adj_matrx = np.maximum.reduce(all_adj)
@@ -153,7 +166,7 @@ class TableConverter(object):
         self.cond = cond
         self.G = nx.Graph()
         self.adj = None
-        self.cutoff_fdr = 0.5
+        self.cutoff_fdr = 0.75
 
     def clean_name(self, col):
         self.df[col] = self.df[col].str.split("_").str[0]
@@ -192,16 +205,17 @@ class TableConverter(object):
             np.savetxt(nm, self.adj, delimiter="\t")
         return True
 
-
-    def fdr_control(self, fdr_cutoff=0.75, plot=True):
+    # used 0.75 for paper
+    def fdr_control(self, plot=True):
         self.df = self.df[self.df['Prob'] >= 0.5]
         decoy = self.df[self.df['isdecoy'] == 'DECOY']['Prob'].values
         target = self.df[self.df['isdecoy'] == 'TARGET']['Prob'].values
         error_stat = qvalue.error_statistics(target, decoy)
-        i0 = (error_stat.qvalue - fdr_cutoff).abs().idxmin()
+        i0 = (error_stat.qvalue - self.cutoff_fdr).abs().idxmin()
         self.cutoff_fdr = error_stat.iloc[i0]["cutoff"]
         print("cutoff for {} is {}".format(self.table, self.cutoff_fdr))
-        self.df = self.df[self.df['Prob'] >= self.cutoff_fdr]
+        # self.df = self.df[self.df['Prob'] >= self.cutoff_fdr]
+        self.df[self.df['Prob'] <= self.cutoff_fdr] = 10**-17
         self.df = self.df[self.df['isdecoy'] == 'TARGET']
         pth = os.path.dirname(os.path.abspath(self.table))
         error_stat.to_csv('{}/error_metrics.txt'.format(pth), sep="\t")
@@ -302,6 +316,8 @@ def runner(tmp_, ids, outf, crapome):
         gr_exps.create_dfs()
         gr_exps.combine_graphs(grids)
         gr_exps.adj_matrix_multi()
+        allprobs = gr_exps.multi_prob_out()
+        allprobs.to_csv(os.path.join(outf, 'probtot_{}.txt'.format(v)), sep='\t')
         # group specific graph
         gr_graphs.append(gr_exps.get_gr_network())
         gen_output(outf, v, gr_exps, crapome)

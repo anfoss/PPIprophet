@@ -5,6 +5,9 @@ import configparser
 import sys
 import os
 import platform
+import multiprocessing.dummy as mult_proc
+from functools import partial
+
 
 
 # modules
@@ -91,31 +94,39 @@ def create_config():
     return config
 
 
+def preprocessing(infile, config):
+    tmp_folder = io.file2folder(infile, prefix=config['GLOBAL']['temp'])
+    preprocess.runner(infile)
+    gen_feat.runner(tmp_folder)
+    predict.runner(tmp_folder)
+
 def main():
     config = create_config()
     # validate.InputTester(config['GLOBAL']['db'], 'db').test_file()
     validate.InputTester(config['GLOBAL']['sid'], 'ids').test_file()
     files = io.read_sample_ids(config['GLOBAL']['sid'])
     files = [os.path.abspath(x) for x in files.keys()]
-    for infile in files:
-        # validate.InputTester(infile, 'in').test_file()
-        tmp_folder = io.file2folder(infile, prefix=config['GLOBAL']['temp'])
-        # preprocess.runner(infile)
-        # gen_feat.runner(tmp_folder)
-        # predict.runner(tmp_folder)
+    multi=False
+    if multi == "True":
+        p = mult_proc.Pool(len(files))
+        preproc_conf = partial(preprocessing, config=config)
+        p.map(preproc_conf, files)
+        p.close()
+        p.join()
+    else:
+        [preprocessing(infile, config) for infile in files]
     combine.runner(
                 tmp_=config['GLOBAL']['temp'],
                 ids=config['GLOBAL']['sid'],
                 outf=config['GLOBAL']['out'],
                 crapome=config['GLOBAL']['crapome']
                 )
-    assert False
-    score.runner(
-                outf=config['GLOBAL']['out'],
-                tmp_=config['GLOBAL']['temp'],
-                crapome=config['GLOBAL']['crapome'],
-                thresh=config['GLOBAL']['thresh']
-                )
+    # score.runner(
+    #             outf=config['GLOBAL']['out'],
+    #             tmp_=config['GLOBAL']['temp'],
+    #             crapome=config['GLOBAL']['crapome'],
+    #             thresh=config['GLOBAL']['thresh']
+    #             )
 
 
 if __name__ == '__main__':
