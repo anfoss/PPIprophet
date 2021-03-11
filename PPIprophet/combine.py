@@ -166,7 +166,7 @@ class TableConverter(object):
         self.cond = cond
         self.G = nx.Graph()
         self.adj = None
-        self.cutoff_fdr = 0.75
+        self.cutoff_fdr = 0.5
 
     def clean_name(self, col):
         self.df[col] = self.df[col].str.split("_").str[0]
@@ -205,7 +205,7 @@ class TableConverter(object):
             np.savetxt(nm, self.adj, delimiter="\t")
         return True
 
-    # used 0.75 for paper
+    # used 0.75 for paper and no split in preprocess
     def fdr_control(self, plot=True):
         self.df = self.df[self.df['Prob'] >= 0.5]
         decoy = self.df[self.df['isdecoy'] == 'DECOY']['Prob'].values
@@ -306,8 +306,8 @@ def runner(tmp_, ids, outf, crapome):
             if not group_info['Sample'].str.contains(fl).any():
                 continue
             pred_out = os.path.join(smpl, "dnn.txt")
-            raw_matrix = os.path.join(smpl, "transf_matrix.txt")
-            grids.extend(list(pd.read_csv(raw_matrix, sep="\t")["ID"]))
+            print(pd.read_csv(fl, sep="\t"))
+            grids.extend(list(pd.read_csv(fl, sep="\t")["GN"]))
             exp = TableConverter(table=pred_out, cond=pred_out)
             exp.fdr_control()
             exp.convert_to_network()

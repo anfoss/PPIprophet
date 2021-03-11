@@ -31,20 +31,28 @@ def mcc(y_true, y_pred):
     return numerator / (denominator + K.epsilon())
 
 
-def runner(base, modelname="./PPIprophet/APprophet_dnn_no_width.h5"):
+@io.timeit
+def runner(base, modelname="./PPIprophet/APprophet_dnn_no_width.h5", chunks=True):
     infile = os.path.join(base, "mp_feat_norm.txt")
     model = tf.keras.models.load_model(modelname, custom_objects={'mcc':mcc})
-    X, memo = io.prepare_feat(infile, dropw=['W'])
-    yhat_probs = model.predict(X, verbose=0)
-    df = pd.DataFrame(np.column_stack([memo, yhat_probs]), columns=["protS", "Prob"])
+    chunk_size=300000
+    missing=["nan", "na", "", None, "n", "-"]
+    arr = np.array([])
+    for chunk in pd.read_csv(infile, sep='\t', na_values=missing, chunksize=chunk_size):
+        X, memo = io.prepare_feat(chunk, dropw=['W'])
+        yhat_probs = model.predict(X, verbose=0)
+        if arr.shape[0]>1:
+            arr = np.vstack((arr, np.column_stack([memo, yhat_probs])))
+        else:
+            arr = np.column_stack([memo, yhat_probs])
+    df = pd.DataFrame(arr, columns=["protS", "Prob"])
     df["ProtA"], df["ProtB"] = df["protS"].str.split("#", 1).str
     isdecoy = ['DECOY' if '_DECOY' in x else 'TARGET' for x in df['ProtA']]
     df['isdecoy'] = isdecoy
-    pred_path = os.path.join(base, "dnn.txt")
     df.drop("protS", inplace=True, axis=1)
     df = df[["ProtA", "ProtB", "Prob", 'isdecoy']]
     # cleanup string to remove _p_0 from middle
     df['ProtA'] = [re.sub("_p_.","",x) for x in df['ProtA']]
     df['ProtB'] = [re.sub("_p_.","",x) for x in df['ProtB']]
-    print(df[df['Prob']>0.5].shape[0], df.shape[0])
+    pred_path = os.path.join(base, "dnn.txt")
     df.to_csv(pred_path, sep="\t", index=False)

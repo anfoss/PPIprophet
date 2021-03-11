@@ -405,13 +405,13 @@ def explode(df, lst_cols, fill_value="", preserve_index=False):
     return res
 
 
-def prepare_feat(infile, thresh=1, missing=["nan", "na", "", None, "n", "-"], dropw=['W', 'SHFT']):
+def prepare_feat(feat, thresh=1, dropw=['W', 'SHFT']):
     """
     read infile and split it
     """
-    feat = pd.read_csv(infile, sep="\t", na_values=missing)
     memos = feat[["MB"]]
     torm = ["ID", "MB"]
+    missing = ["nan", "na", "", None, "n", "-"]
     feat.drop(torm, axis=1, inplace=True)
     cor = split_to_df(feat, "COR")
     dif = split_to_df(feat, "DIF")
