@@ -59,16 +59,22 @@ class NetworkCombiner(object):
         for G in self.networks:
             # adj = nx.adjacency_matrix(G, nodelist=self.ids, weight="weight")
             df = nx.to_pandas_edgelist(G)
-            df = df[df['weight']>=0.5]
+            df2 = df.copy()
+            df2.columns = ['target', 'source', 'weight']
+            df2 = df2[['source', 'target', 'weight']]
+            df = pd.concat([df, df2])
             allprobs.append(df)
         tots = reduce(lambda l,r: pd.merge(l,r,on=['source', 'target'], how='outer'), allprobs)
+        # replace interactions with all NAN to 0
+        tots.set_index(['source','target'])
+        tots = tots.replace(10**-17, np.nan)
+        tots.dropna(how='all', axis=0, inplace=True)
         return tots
 
     def calc_freq(self, all_adj):
         """
         return a frequency matrix for positive interactions
         """
-
         all_adj = [np.where(x >= 0.5, 1, 0) for x in all_adj]
         # here we sum them all
         outm = np.zeros(all_adj[0].shape, dtype=np.int64)
@@ -166,7 +172,8 @@ class TableConverter(object):
         self.cond = cond
         self.G = nx.Graph()
         self.adj = None
-        self.cutoff_fdr = 0.5
+        # used 0.75 in paper
+        self.cutoff_fdr = 1
 
     def clean_name(self, col):
         self.df[col] = self.df[col].str.split("_").str[0]
@@ -215,6 +222,7 @@ class TableConverter(object):
         self.cutoff_fdr = error_stat.iloc[i0]["cutoff"]
         print("cutoff for {} is {}".format(self.table, self.cutoff_fdr))
         # self.df = self.df[self.df['Prob'] >= self.cutoff_fdr]
+        # 0s the probability below fdr thresholds
         self.df[self.df['Prob'] <= self.cutoff_fdr] = 10**-17
         self.df = self.df[self.df['isdecoy'] == 'TARGET']
         pth = os.path.dirname(os.path.abspath(self.table))
@@ -306,7 +314,6 @@ def runner(tmp_, ids, outf, crapome):
             if not group_info['Sample'].str.contains(fl).any():
                 continue
             pred_out = os.path.join(smpl, "dnn.txt")
-            print(pd.read_csv(fl, sep="\t"))
             grids.extend(list(pd.read_csv(fl, sep="\t")["GN"]))
             exp = TableConverter(table=pred_out, cond=pred_out)
             exp.fdr_control()
@@ -325,12 +332,12 @@ def runner(tmp_, ids, outf, crapome):
 
     G2 = gr_graphs.pop()
     mx = 0
+    # here select max interaction score per ppi across baits
     for g in gr_graphs:
         for a,b, attrs in g.edges(data=True):
             if G2.has_edge(a,b):
                 if G2[a][b]['weight'] < attrs['weight']:
                     G2[a][b]['weight'] = attrs['weight']
-
             else:
                 G2.add_edge(a,b, weight=attrs['weight'])
     # filter weights

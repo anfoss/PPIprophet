@@ -10,7 +10,7 @@ import PPIprophet.stats_ as st
 
 
 # standardize and center methods
-def center_arr(hoa, fr_nr="all", smooth=True, stretch=(True, 72)):
+def center_arr(hoa, fr_nr="all", smooth=False, stretch=(True, 72)):
     norm = {}
     for k in hoa:
         key = hoa[k]
@@ -68,7 +68,7 @@ def split_peaks(prot_arr, pr, skp=0):
     returns
     'right_bases': array([32]), 'left_bases': array([7])
     """
-    peaks = list(st.peak_picking(prot_arr, height=0.1, width=3))
+    peaks = list(st.peak_picking(prot_arr, height=0.2, width=3))
     left_bases = peaks[1]["left_bases"]
     right_bases = peaks[1]["right_bases"]
     fr_peak = peaks[0]
@@ -143,7 +143,8 @@ def gen_pairs_vec(prot, decoy=True, pow=6, thres=0.0):
 
     # decoys
     neg = np.column_stack(np.where(arr <= thres))
-    neg = neg[np.random.choice(neg.shape[0], pos.shape[0], replace=False), :]
+    # fishing pos.shape[0] decoys. maybe 2 decoys per protein is better?
+    neg = neg[np.random.choice(neg.shape[0], pos.shape[0], replace=True), :]
     neg = pd.DataFrame(neg)
     prot2 = {k: ",".join(map(str, v)) for k,v in prot.items()}
     neg = neg[neg[0] !=neg[1]]
@@ -214,7 +215,7 @@ def impute_namean(ls):
 
 
 # used split == False in paper
-def runner(infile, split=True):
+def runner(infile, split=False):
     prot = io.read_txt(infile)
     print("preprocessing " + infile)
     # write it for differential stretch it to assert same length

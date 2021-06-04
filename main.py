@@ -102,19 +102,19 @@ def preprocessing(infile, config):
 
 def main():
     config = create_config()
-    # validate.InputTester(config['GLOBAL']['db'], 'db').test_file()
     validate.InputTester(config['GLOBAL']['sid'], 'ids').test_file()
     files = io.read_sample_ids(config['GLOBAL']['sid'])
     files = [os.path.abspath(x) for x in files.keys()]
     multi=False
-    if multi == "True":
-        p = mult_proc.Pool(len(files))
-        preproc_conf = partial(preprocessing, config=config)
-        p.map(preproc_conf, files)
-        p.close()
-        p.join()
-    else:
-        [preprocessing(infile, config) for infile in files]
+    # if multi == "True":
+    #     p = mult_proc.Pool(len(files))
+    #     preproc_conf = partial(preprocessing, config=config)
+    #     p.map(preproc_conf, files)
+    #     p.close()
+    #     p.join()
+    # else:
+    #     [preprocessing(infile, config) for infile in files]
+    #
     combine.runner(
                 tmp_=config['GLOBAL']['temp'],
                 ids=config['GLOBAL']['sid'],
