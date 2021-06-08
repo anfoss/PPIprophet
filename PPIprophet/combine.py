@@ -35,7 +35,7 @@ class NetworkCombiner(object):
         self.ids = None
         self.combined = None
         # used mean for paper
-        self.combine = 'mean'
+        self.combine = 'prob'
         self.comb_net = None
 
     def add_exp(self, exp):

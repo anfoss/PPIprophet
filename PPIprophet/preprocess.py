@@ -31,6 +31,10 @@ def center_arr(hoa, fr_nr="all", smooth=False, stretch=(True, 72)):
     return norm
 
 
+def add_db():
+    pass
+
+
 def als(y, lam=10, p=0.5, niter=100, pl=False, fr=72):
     """
     p for asymmetry and λ for smoothness.
@@ -127,13 +131,17 @@ def gen_pairs_vec(prot, decoy=True, pow=6, thres=0.0):
         memo.append(p)
         arr.append(v)
     arr = np.corrcoef(np.array(arr))
+    np.fill_diagonal(arr, 0)
+    arrpos = arr.copy()
+    arrpos[np.tril_indices(arrpos.shape[0], -1)] = 0
+    ## add db here and drop duplicates
 
     # positive
-    pos = np.column_stack(np.where(arr > thres))
+    pos = np.column_stack(np.where(arrpos > thres))
     pos = pd.DataFrame(pos)
+    print(pos.shape)
     prot2 = {k: ",".join(map(str, v)) for k,v in prot.items()}
     memo = dict(zip(range(len(memo)), memo))
-    pos = pos[pos[0] !=pos[1]]
     pos.replace(memo, inplace=True)
     pos['ID'] = np.arange(1,pos.shape[0]+1)
     pos['ID'] = 'ppi_' + pos['ID'].astype(str)
