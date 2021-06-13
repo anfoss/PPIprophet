@@ -117,7 +117,7 @@ def zero_sequence(arr):
         idx += 1
 
 # @io.timeit
-def gen_pairs_vec(prot, decoy=True, pow=6, thres=0.0):
+def gen_pairs_vec(prot, decoy=True, pow=6, thres=0.0, db=None):
     import random
 
     np.random.seed(0)
@@ -134,19 +134,24 @@ def gen_pairs_vec(prot, decoy=True, pow=6, thres=0.0):
     np.fill_diagonal(arr, 0)
     arrpos = arr.copy()
     arrpos[np.tril_indices(arrpos.shape[0], -1)] = 0
-    ## add db here and drop duplicates
-
     # positive
     pos = np.column_stack(np.where(arrpos > thres))
     pos = pd.DataFrame(pos)
-    print(pos.shape)
     prot2 = {k: ",".join(map(str, v)) for k,v in prot.items()}
     memo = dict(zip(range(len(memo)), memo))
     pos.replace(memo, inplace=True)
+    # add db if present
+    if db!='False':
+        dd = pd.read_csv(db, sep='\t')
+        dd.columns = pos.columns
+        dd = dd[dd[0].isin(prot2.keys())]
+        dd = dd[dd[1].isin(prot2.keys())]
+        pos = pd.concat([pos, dd])
     pos['ID'] = np.arange(1,pos.shape[0]+1)
     pos['ID'] = 'ppi_' + pos['ID'].astype(str)
     pos['MB'] = pos[0] + '#' + pos[1]
     ft_pos = pos.replace(prot2)
+    # here dropna
     pos['FT'] = ft_pos[0] + '#' + ft_pos[1]
 
     # decoys
@@ -168,44 +173,6 @@ def gen_pairs_vec(prot, decoy=True, pow=6, thres=0.0):
     return tots
 
 
-# @io.timeit
-def gen_pairs(prot, decoy=True, pow=6, thres=0):
-    """
-    generate all possible pairs between proteins
-    remove self dupl i.e between same protein but different apex
-    """
-    import random
-    pairs = list(itertools.combinations(list(prot.keys()), 2))
-    ppi = []
-    idx = 0
-    lookup = []
-    for p in pairs:
-        tmp = np.corrcoef(prot[p[0]], prot[p[1]])[0][-1]
-        # wgna style
-        if tmp > thres:
-            l1 = ",".join(map(str, prot[p[0]]))
-            l2 = ",".join(map(str, prot[p[1]]))
-            row = "#".join([l1, l2])
-            nm = "ppi_" + str(idx)
-            ids = "#".join(sorted(p))
-            ppi.append("\t".join([nm, ids, row]))
-            lookup.append(ids)
-            idx += 1
-    if decoy:
-        for x in range(0, len(ppi)):
-            random.seed(x)
-            dec = random.choice(pairs)
-            while "#".join(sorted(dec)) in lookup:
-                dec = random.choice(pairs)
-            l1 = ",".join(map(str, prot[dec[0]]))
-            l2 = ",".join(map(str, prot[dec[1]]))
-            row = "#".join([l1, l2])
-            nm = "DECOY_ppi_" + str(idx)
-            ppi.append("\t".join([nm, "#".join([x + '_DECOY' for x in dec]), row]))
-            idx+=1
-    return ppi
-
-
 def impute_namean(ls):
     """
     impute 0s in list with value in between if neighbours are values
@@ -223,7 +190,7 @@ def impute_namean(ls):
 
 
 # used split == False in paper
-def runner(infile, split=False):
+def runner(infile, db, split=False):
     prot = io.read_txt(infile)
     print("preprocessing " + infile)
     # write it for differential stretch it to assert same length
@@ -246,7 +213,7 @@ def runner(infile, split=False):
     # write transf matrix
     dest = os.path.join(base, "transf_matrix.txt")
     pr_df.to_csv(dest, sep="\t", encoding="utf-8", index_label="ID")
-    ppi = gen_pairs_vec(prot2, decoy=True)
+    ppi = gen_pairs_vec(prot2, decoy=True, db=db)
     nm = os.path.join(base, "ppi.txt")
     # io.wrout(ppi, nm, ["ID", "MB", "FT"])
     ppi.to_csv(nm, sep='\t', index=False)

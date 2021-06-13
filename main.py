@@ -43,7 +43,7 @@ def create_config():
         help='ppi network in STRING format',
         dest='database',
         action='store',
-        default='20190513_CORUMcoreComplexes.txt',
+        default=False,
     )
     # maybe better to add function for generating a dummy sample id?
     parser.add_argument(
@@ -85,7 +85,7 @@ def create_config():
         'temp': r'./tmp',
         'out': args.out,
         'crapome': args.crap,
-        'thresh': args.thres
+        'thresh': args.thres,
     }
 
     # create config ini file for backup
@@ -96,7 +96,7 @@ def create_config():
 
 def preprocessing(infile, config):
     tmp_folder = io.file2folder(infile, prefix=config['GLOBAL']['temp'])
-    preprocess.runner(infile)
+    preprocess.runner(infile, db=config['GLOBAL']['db'])
     gen_feat.runner(tmp_folder)
     predict.runner(tmp_folder)
 
@@ -106,15 +106,15 @@ def main():
     files = io.read_sample_ids(config['GLOBAL']['sid'])
     files = [os.path.abspath(x) for x in files.keys()]
     multi=False
-    # if multi == "True":
-    #     p = mult_proc.Pool(len(files))
-    #     preproc_conf = partial(preprocessing, config=config)
-    #     p.map(preproc_conf, files)
-    #     p.close()
-    #     p.join()
-    # else:
-    #     [preprocessing(infile, config) for infile in files]
-    #
+    if multi == "True":
+        p = mult_proc.Pool(len(files))
+        preproc_conf = partial(preprocessing, config=config)
+        p.map(preproc_conf, files)
+        p.close()
+        p.join()
+    else:
+        [preprocessing(infile, config) for infile in files]
+
     combine.runner(
                 tmp_=config['GLOBAL']['temp'],
                 ids=config['GLOBAL']['sid'],

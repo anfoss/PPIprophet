@@ -6,7 +6,6 @@ from scipy import stats
 import pandas as pd
 from scipy.ndimage import uniform_filter
 import multiprocessing as mp
-import dask
 
 import PPIprophet.io_ as io
 import PPIprophet.stats_ as st
@@ -21,6 +20,7 @@ class ProteinProfile(object):
         self.acc = acc
         self.inten = np.array([float(x) for x in inten])
         self.peaks = []
+
     def get_inte(self):
         return self.inten
 
@@ -320,9 +320,9 @@ def gen_feat(cmplx):
     if cmplx.align_peaks():
         cmplx.calc_width()
         cmplx.pairwise()
-        return cmplx.create_row()
+        return cmplx.create_row(), cmplx.get_peaks()
     else:
-        return pd.Series()
+        return None, None
 
 # wrapper
 def mp_cmplx(filename):
