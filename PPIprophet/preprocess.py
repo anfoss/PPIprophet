@@ -149,6 +149,7 @@ def gen_pairs_vec(prot, decoy=True, pow=6, thres=0.0, db=None):
         pos = pd.concat([pos, dd])
     pos['ID'] = np.arange(1,pos.shape[0]+1)
     pos['ID'] = 'ppi_' + pos['ID'].astype(str)
+    pos = pos[pos[0] !=pos[1]]
     pos['MB'] = pos[0] + '#' + pos[1]
     ft_pos = pos.replace(prot2)
     # here dropna

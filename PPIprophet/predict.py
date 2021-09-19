@@ -31,6 +31,28 @@ def mcc(y_true, y_pred):
     return numerator / (denominator + K.epsilon())
 
 
+def plot_probability(df, path):
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(figsize=(3, 3), facecolor='white')
+    fig.set_size_inches(4, 4)
+    pl = sns.displot(df, x="Prob",
+                     hue="isdecoy",
+                     fill=True,
+                     element="step")
+    plt.xlabel("Probability", fontsize=9)
+    plt.ylabel("Density")
+    ax.spines["bottom"].set_color('grey')
+    ax.grid(color="w", alpha=0.5)
+    ax.tick_params(axis='y', which='major', labelsize=9)
+    ax.tick_params(axis='x', which='minor', labelsize=6)
+    ax.tick_params(axis='x', which='major', labelsize=6)
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    plt.savefig(path, dpi=600, bbox_inches="tight")
+    plt.close()
+
+
 @io.timeit
 def runner(base, modelname="./PPIprophet/APprophet_dnn_no_width.h5", chunks=True):
     infile = os.path.join(base, "mp_feat_norm.txt")
@@ -56,3 +78,4 @@ def runner(base, modelname="./PPIprophet/APprophet_dnn_no_width.h5", chunks=True
     df['ProtB'] = [re.sub("_p_.","",x) for x in df['ProtB']]
     pred_path = os.path.join(base, "dnn.txt")
     df.to_csv(pred_path, sep="\t", index=False)
+    plot_probability(df, os.path.join(base, "prob.pdf"))

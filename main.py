@@ -13,7 +13,8 @@ from functools import partial
 # modules
 from PPIprophet import io_ as io
 from PPIprophet import validate_input as validate
-from PPIprophet import gen_feat_v3 as gen_feat
+#from PPIprophet import gen_feat_v3 as gen_feat
+from PPIprophet import gen_feat_v4 as gen_feat
 from PPIprophet import predict
 from PPIprophet import preprocess
 from PPIprophet import score
