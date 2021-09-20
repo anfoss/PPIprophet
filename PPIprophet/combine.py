@@ -215,18 +215,21 @@ class TableConverter(object):
     # used 0.75 for paper and no split in preprocess
     def fdr_control(self, plot=True):
         self.df = self.df[self.df['Prob'] >= 0.5]
-        decoy = self.df[self.df['isdecoy'] == 'DECOY']['Prob'].values
-        target = self.df[self.df['isdecoy'] == 'TARGET']['Prob'].values
-        error_stat = qvalue.error_statistics(target, decoy)
-        i0 = (error_stat.qvalue - self.cutoff_fdr).abs().idxmin()
-        self.cutoff_fdr = error_stat.iloc[i0]["cutoff"]
-        print("cutoff for {} is {}".format(self.table, self.cutoff_fdr))
-        # self.df = self.df[self.df['Prob'] >= self.cutoff_fdr]
-        # 0s the probability below fdr thresholds
-        self.df[self.df['Prob'] <= self.cutoff_fdr] = 10**-17
-        self.df = self.df[self.df['isdecoy'] == 'TARGET']
-        pth = os.path.dirname(os.path.abspath(self.table))
-        error_stat.to_csv('{}/error_metrics.txt'.format(pth), sep="\t")
+        if self.cutoff_fdr < 1 :
+            decoy = self.df[self.df['isdecoy'] == 'DECOY']['Prob'].values
+            target = self.df[self.df['isdecoy'] == 'TARGET']['Prob'].values
+            error_stat = qvalue.error_statistics(target, decoy)
+            i0 = (error_stat.qvalue - self.cutoff_fdr).abs().idxmin()
+            self.cutoff_fdr = error_stat.iloc[i0]["cutoff"]
+            print("cutoff for {} is {}".format(self.table, self.cutoff_fdr))
+            # self.df = self.df[self.df['Prob'] >= self.cutoff_fdr]
+            # 0s the probability below fdr thresholds
+            self.df[self.df['Prob'] <= self.cutoff_fdr] = 10**-17
+            self.df = self.df[self.df['isdecoy'] == 'TARGET']
+            pth = os.path.dirname(os.path.abspath(self.table))
+            error_stat.to_csv('{}/error_metrics.txt'.format(pth), sep="\t")
+        else:
+            pass
 
 
     def get_adj_matrx(self):

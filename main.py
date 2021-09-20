@@ -97,8 +97,8 @@ def create_config():
 
 def preprocessing(infile, config):
     tmp_folder = io.file2folder(infile, prefix=config['GLOBAL']['temp'])
-    preprocess.runner(infile, db=config['GLOBAL']['db'])
-    gen_feat.runner(tmp_folder)
+    # preprocess.runner(infile, db=config['GLOBAL']['db'])
+    # gen_feat.runner(tmp_folder)
     predict.runner(tmp_folder)
 
 def main():
