@@ -53,9 +53,8 @@ def plot_probability(df, path):
     plt.close()
 
 
-@io.timeit
-# good model = APprophet_dnn_no_width.h5
-def runner(base, modelname="./PPIprophet/model_dia_hek_144.h5", chunks=True):
+# @io.timeit
+def runner(base, modelname="./PPIprophet/model_ppi_144.h5.h5", chunks=True):
     infile = os.path.join(base, "mp_feat_norm.txt")
     model = tf.keras.models.load_model(modelname, custom_objects={'mcc':mcc})
     chunk_size=300000
