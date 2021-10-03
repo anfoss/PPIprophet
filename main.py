@@ -97,8 +97,8 @@ def create_config():
 
 def preprocessing(infile, config):
     tmp_folder = io.file2folder(infile, prefix=config['GLOBAL']['temp'])
-    # preprocess.runner(infile, db=config['GLOBAL']['db'])
-    # gen_feat.runner(tmp_folder)
+    preprocess.runner(infile, db=config['GLOBAL']['db'])
+    gen_feat.runner(tmp_folder)
     predict.runner(tmp_folder)
 
 def main():
@@ -122,12 +122,12 @@ def main():
                 outf=config['GLOBAL']['out'],
                 crapome=config['GLOBAL']['crapome']
                 )
-    # score.runner(
-    #             outf=config['GLOBAL']['out'],
-    #             tmp_=config['GLOBAL']['temp'],
-    #             crapome=config['GLOBAL']['crapome'],
-    #             thresh=config['GLOBAL']['thresh']
-    #             )
+    score.runner(
+                outf=config['GLOBAL']['out'],
+                tmp_=config['GLOBAL']['temp'],
+                crapome=config['GLOBAL']['crapome'],
+                thresh=config['GLOBAL']['thresh']
+                )
 
 
 if __name__ == '__main__':
