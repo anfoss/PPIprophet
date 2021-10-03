@@ -96,7 +96,7 @@ def fill_zeroes(prot, pk, left_base, right_base):
     arr = prot.copy()
     arr[:left_base] = [0 for aa in arr[:left_base]]
     arr[right_base:] = [0 for aa in arr[right_base:]]
-    right = zero_sequence(arr[pk: len(arr)])
+    right = zero_sequence(arr[pk : len(arr)])
     left = zero_sequence(arr[:pk][::-1])[::-1]
     return left + right
 
@@ -115,6 +115,7 @@ def zero_sequence(arr):
             l = [0] * (len(arr) - len(tmp))
             return tmp + l
         idx += 1
+
 
 # @io.timeit
 def gen_pairs_vec(prot, decoy=True, pow=6, thres=0.0, db=None):
@@ -137,40 +138,40 @@ def gen_pairs_vec(prot, decoy=True, pow=6, thres=0.0, db=None):
     # positive
     pos = np.column_stack(np.where(arrpos > thres))
     pos = pd.DataFrame(pos)
-    prot2 = {k: ",".join(map(str, v)) for k,v in prot.items()}
+    prot2 = {k: ",".join(map(str, v)) for k, v in prot.items()}
     memo = dict(zip(range(len(memo)), memo))
     pos.replace(memo, inplace=True)
     # add db if present
-    if db!='False':
-        dd = pd.read_csv(db, sep='\t')
+    if db != "False":
+        dd = pd.read_csv(db, sep="\t")
         dd.columns = pos.columns
         dd = dd[dd[0].isin(prot2.keys())]
         dd = dd[dd[1].isin(prot2.keys())]
         pos = pd.concat([pos, dd])
-    pos['ID'] = np.arange(1,pos.shape[0]+1)
-    pos['ID'] = 'ppi_' + pos['ID'].astype(str)
-    pos = pos[pos[0] !=pos[1]]
-    pos['MB'] = pos[0] + '#' + pos[1]
+    pos["ID"] = np.arange(1, pos.shape[0] + 1)
+    pos["ID"] = "ppi_" + pos["ID"].astype(str)
+    pos = pos[pos[0] != pos[1]]
+    pos["MB"] = pos[0] + "#" + pos[1]
     ft_pos = pos.replace(prot2)
     # here dropna
-    pos['FT'] = ft_pos[0] + '#' + ft_pos[1]
+    pos["FT"] = ft_pos[0] + "#" + ft_pos[1]
 
     # decoys
     neg = np.column_stack(np.where(arr <= thres))
     # fishing pos.shape[0] decoys. maybe 2 decoys per protein is better?
     neg = neg[np.random.choice(neg.shape[0], pos.shape[0], replace=True), :]
     neg = pd.DataFrame(neg)
-    prot2 = {k: ",".join(map(str, v)) for k,v in prot.items()}
-    neg = neg[neg[0] !=neg[1]]
+    prot2 = {k: ",".join(map(str, v)) for k, v in prot.items()}
+    neg = neg[neg[0] != neg[1]]
     neg.replace(memo, inplace=True)
-    neg['ID'] = np.arange(pos.shape[0]+1, neg.shape[0]+pos.shape[0]+1)
-    neg['ID'] = 'DECOY_ppi_' + neg['ID'].astype(str)
+    neg["ID"] = np.arange(pos.shape[0] + 1, neg.shape[0] + pos.shape[0] + 1)
+    neg["ID"] = "DECOY_ppi_" + neg["ID"].astype(str)
     # now add the features
     ft_neg = neg.replace(prot2)
-    neg['MB'] = neg[0] +'_DECOY' + '#' + neg[1] + '_DECOY'
-    neg['FT'] = ft_neg[0] + '#' + ft_neg[1]
-    tots = pd.concat([neg,pos])
-    tots.drop([0,1], axis=1, inplace=True)
+    neg["MB"] = neg[0] + "_DECOY" + "#" + neg[1] + "_DECOY"
+    neg["FT"] = ft_neg[0] + "#" + ft_neg[1]
+    tots = pd.concat([neg, pos])
+    tots.drop([0, 1], axis=1, inplace=True)
     return tots
 
 
@@ -217,5 +218,5 @@ def runner(infile, db, split=False):
     ppi = gen_pairs_vec(prot2, decoy=True, db=db)
     nm = os.path.join(base, "ppi.txt")
     # io.wrout(ppi, nm, ["ID", "MB", "FT"])
-    ppi.to_csv(nm, sep='\t', index=False)
+    ppi.to_csv(nm, sep="\t", index=False)
     return True

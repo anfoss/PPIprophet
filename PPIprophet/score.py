@@ -90,9 +90,13 @@ def calc_fdr(target, decoy):
         nt = np.where(target >= s)[0].shape[0] / target.shape[0]
         nd = np.where(decoy >= s)[0].shape[0] / decoy.shape[0]
         if nt == 0 or (nd / nt) > 1.0:
-            fdr[i, ] = (nt, nd, 1.0, s)
+            fdr[
+                i,
+            ] = (nt, nd, 1.0, s)
         else:
-            fdr[i, ] = (nt, nd, nd / nt, s)
+            fdr[
+                i,
+            ] = (nt, nd, nd / nt, s)
     return fdr
 
 
@@ -177,10 +181,8 @@ def rec_mcl(adj_matrix):
     result = mcl.run_mcl(adj_matrix, verbose=False)
     clusters = mcl.get_clusters(result)
     opt = mcl.run_mcl(
-                      adj_matrix,
-                      expansion=3,
-                      inflation=optimize_mcl(adj_matrix, result, clusters)
-                      )
+        adj_matrix, expansion=3, inflation=optimize_mcl(adj_matrix, result, clusters)
+    )
     clusters = mcl.get_clusters(opt)
     return clusters
 
@@ -249,14 +251,16 @@ def filter_crap(m, ids, crap, thres=0.4):
     Returns:
     Raises:
     """
+
     def freq(x):
         return x[x > 0].shape[0] / x.shape[0]
+
     crap = pd.read_csv(crap, sep="\t")
-    crap.set_index('Gene', inplace=True)
-    crap.drop(['RefSeq', 'UniProt'], axis=1, inplace=True)
-    crap['ss'] = crap.apply(lambda x: freq(x.values), axis=1)
+    crap.set_index("Gene", inplace=True)
+    crap.drop(["RefSeq", "UniProt"], axis=1, inplace=True)
+    crap["ss"] = crap.apply(lambda x: freq(x.values), axis=1)
     # print(crap[crap.index.str.contains('^POL')])
-    crap = crap[crap['ss'] >= float(thres)]
+    crap = crap[crap["ss"] >= float(thres)]
     mask = np.isin(np.array(ids), crap.index.values)
     ids = list(np.array(ids)[~mask])
     m = m[~mask]

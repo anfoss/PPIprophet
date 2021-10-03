@@ -17,11 +17,13 @@ class ProteinProfile(object):
     """
     docstring for ProteinProfile
     """
+
     def __init__(self, acc, inten):
         super(ProteinProfile, self).__init__()
         self.acc = acc
         self.inten = np.array([float(x) for x in inten])
         self.peaks = []
+
     def get_inte(self):
         return self.inten
 
@@ -40,7 +42,6 @@ class ProteinProfile(object):
         else:
             self.peaks = [int(np.argmax(self.inten))]
         # avoid breakage due to float
-
 
 
 class ComplexProfile(object):
@@ -162,7 +163,7 @@ class ComplexProfile(object):
         """
         performs pairwise comparison
         """
-        if len(self.members)==2:
+        if len(self.members) == 2:
             self.calc_corr(self.members)
             self.calc_diff(*self.members)
             self.calc_shift([x.get_acc() for x in self.members])
@@ -186,7 +187,7 @@ class ComplexProfile(object):
         #     prot_fwhm = st.fwhm(list(prot_peak))
         #     width.append(prot_fwhm)
         # self.width = np.mean(width)
-        self.width=4
+        self.width = 4
 
     def create_row(self):
         """
@@ -197,12 +198,8 @@ class ComplexProfile(object):
         row_id = self.get_name()
         members = self.format_ids()
         #
-        return [row_id,
-            members,
-            cor_conc,
-            self.shifts,
-            dif_conc,
-            self.width]
+        return [row_id, members, cor_conc, self.shifts, dif_conc, self.width]
+
 
 def add_top(result, item):
     """Inserts item into list of results"""
@@ -215,7 +212,7 @@ def add_top(result, item):
 
 
 def minimize(solution):
-    """Returns total difference of solution passed """
+    """Returns total difference of solution passed"""
     length = len(solution)
     result = 0
     for index, number1 in enumerate(solution):
@@ -303,9 +300,9 @@ def format_hash(temp):
     """
     get a row hash and create a ComplexProfile object
     """
-    inten = temp['FT'].split("#")
-    members = temp['MB'].split("#")
-    tmp = ComplexProfile(temp['ID'])
+    inten = temp["FT"].split("#")
+    members = temp["MB"].split("#")
+    tmp = ComplexProfile(temp["ID"])
     for idx, acc in enumerate(members):
         if acc in tmp.get_members():
             continue
@@ -332,6 +329,7 @@ def gen_feat(s):
 def process_slice(df):
     return df.apply(gen_feat, axis=1).dropna()
 
+
 # wrapper
 def mp_cmplx(filename):
     """
@@ -346,17 +344,16 @@ def mp_cmplx(filename):
     things, header = [], []
     temp = {}
     print("calculating features for " + filename)
-    df = pd.read_csv(filename, sep='\t')
+    df = pd.read_csv(filename, sep="\t")
     sd = dd.from_pandas(df, npartitions=8)
     feats = pd.DataFrame(
-        sd.map_partitions(
-            lambda df: process_slice(df), meta=(None, "object")
-        )
+        sd.map_partitions(lambda df: process_slice(df), meta=(None, "object"))
         .compute(scheduler="processes")
         .values.tolist()
     )
     feats.columns = ["ID", "MB", "COR", "SHFT", "DIF", "W"]
     return feats
+
 
 def runner(base):
     """
@@ -367,4 +364,4 @@ def runner(base):
     print(os.path.dirname(os.path.realpath(__file__)))
     wr = mp_cmplx(filename=cmplx_comb)
     feature_path = os.path.join(base, "mp_feat_norm.txt")
-    wr.to_csv(feature_path, sep='\t')
+    wr.to_csv(feature_path, sep="\t")

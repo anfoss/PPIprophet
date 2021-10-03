@@ -24,11 +24,11 @@ def makehash(w=dict):
 
 def makedeephash():
     """autovivification like hash in perl
-     http://stackoverflow.com/questions/651794/whats-the-best-way-to-initialize-a-dict-of-dicts-in-python
-     use call it on hash like h = makehash()
-     then directly
-     h[1][2]= 3
-     useful ONLY for a 2 level hash
+    http://stackoverflow.com/questions/651794/whats-the-best-way-to-initialize-a-dict-of-dicts-in-python
+    use call it on hash like h = makehash()
+    then directly
+    h[1][2]= 3
+    useful ONLY for a 2 level hash
     """
     # return defaultdict(makehash)
     return defaultdict(makedeephash)
@@ -36,11 +36,11 @@ def makedeephash():
 
 def makehashlist():
     """autovivification like hash in perl
-     http://stackoverflow.com/questions/651794/whats-the-best-way-to-initialize-a-dict-of-dicts-in-python
-     use call it on hash like h = makehash()
-     then directly
-     h[1][2]= 3
-     useful ONLY for a 2 level hash
+    http://stackoverflow.com/questions/651794/whats-the-best-way-to-initialize-a-dict-of-dicts-in-python
+    use call it on hash like h = makehash()
+    then directly
+    h[1][2]= 3
+    useful ONLY for a 2 level hash
     """
     # return defaultdict(makehash)
     return defaultdict(list)
@@ -48,11 +48,11 @@ def makehashlist():
 
 def makehashset():
     """autovivification like hash in perl
-     http://stackoverflow.com/questions/651794/whats-the-best-way-to-initialize-a-dict-of-dicts-in-python
-     use call it on hash like h = makehash()
-     then directly
-     h[1][2]= 3
-     useful ONLY for a 2 level hash
+    http://stackoverflow.com/questions/651794/whats-the-best-way-to-initialize-a-dict-of-dicts-in-python
+    use call it on hash like h = makehash()
+    then directly
+    h[1][2]= 3
+    useful ONLY for a 2 level hash
     """
     # return defaultdict(makehash)
     return defaultdict(set)
@@ -347,7 +347,7 @@ def catch(func, handle=lambda e: e, *args, **kwargs):
 
 def uniqueid():
     """
-      generate unique id with length 17 to 21
+    generate unique id with length 17 to 21
     """
     mynow = datetime.now
     sft = datetime.strftime
@@ -405,7 +405,7 @@ def explode(df, lst_cols, fill_value="", preserve_index=False):
     return res
 
 
-def prepare_feat(feat, thresh=1, dropw=['W', 'SHFT']):
+def prepare_feat(feat, thresh=1, dropw=["W", "SHFT"]):
     """
     read infile and split it
     """
@@ -437,6 +437,7 @@ def timeit(method):
         else:
             print("%r  %2.2f ms" % (method.__name__, (te - ts) * 1000))
         return result
+
     return timed
 
 
@@ -447,10 +448,12 @@ def read_crap(crap):
     Returns:
     Raises:
     """
+
     def freq(x):
         return x[x > 0].shape[0] / x.shape[0]
+
     crap = pd.read_csv(crap, sep="\t")
-    crap.set_index('Gene', inplace=True)
-    crap.drop(['RefSeq', 'UniProt'], axis=1, inplace=True)
-    crap['ss'] = crap.apply(lambda x: freq(x.values), axis=1)
-    return dict(zip(crap.index, crap['ss'].values))
+    crap.set_index("Gene", inplace=True)
+    crap.drop(["RefSeq", "UniProt"], axis=1, inplace=True)
+    crap["ss"] = crap.apply(lambda x: freq(x.values), axis=1)
+    return dict(zip(crap.index, crap["ss"].values))
