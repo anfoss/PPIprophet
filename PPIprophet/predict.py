@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from tensorflow.keras import backend as K
-import joblib
 import re
 
 from PPIprophet import io_ as io
@@ -51,7 +50,7 @@ def plot_probability(df, path):
 
 
 # @io.timeit
-def runner(base, modelname="./PPIprophet/model_ppi_144.h5.h5", chunks=True):
+def runner(base, modelname="./PPIprophet/model_ppi_144.h5", chunks=True):
     infile = os.path.join(base, "mp_feat_norm.txt")
     model = tf.keras.models.load_model(modelname, custom_objects={"mcc": mcc})
     chunk_size = 300000

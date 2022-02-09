@@ -118,9 +118,8 @@ def zero_sequence(arr):
 
 
 # @io.timeit
-def gen_pairs_vec(prot, decoy=True, pow=6, thres=0.0, db=None):
+def gen_pairs_vec(prot, decoy=True, pow=6, thres=0.2, db=None):
     import random
-
     np.random.seed(0)
     pairs = list(itertools.combinations(list(prot.keys()), 2))
     ppi = []
