@@ -13,7 +13,6 @@ from functools import partial
 # modules
 from PPIprophet import io_ as io
 from PPIprophet import validate_input as validate
-#from PPIprophet import gen_feat_v3 as gen_feat
 from PPIprophet import gen_feat_v4 as gen_feat
 from PPIprophet import predict
 from PPIprophet import preprocess
@@ -36,7 +35,7 @@ def create_config():
     '''
     parse command line and create .ini file for configuration
     '''
-    parser = ParserHelper(description='Protein Complex Prophet argument')
+    parser = ParserHelper(description='PPIprophet argument')
     os_s = get_os()
     boolean = ['True', 'False']
     parser.add_argument(
@@ -45,6 +44,13 @@ def create_config():
         dest='database',
         action='store',
         default=False,
+    )
+    parser.add_argument(
+        '-fdr',
+        help='global FDR threshold',
+        dest='fdr',
+        action='store',
+        default=0.5,
     )
     # maybe better to add function for generating a dummy sample id?
     parser.add_argument(
@@ -83,6 +89,7 @@ def create_config():
     config['GLOBAL'] = {
         'db': args.database,
         'sid': args.sample_ids,
+        'fdr': args.fdr,
         'temp': r'./tmp',
         'out': args.out,
         'crapome': args.crap,
@@ -120,7 +127,8 @@ def main():
                 tmp_=config['GLOBAL']['temp'],
                 ids=config['GLOBAL']['sid'],
                 outf=config['GLOBAL']['out'],
-                crapome=config['GLOBAL']['crapome']
+                crapome=config['GLOBAL']['crapome'],
+                fdr=config['GLOBAL']['fdr']
                 )
     score.runner(
                 outf=config['GLOBAL']['out'],

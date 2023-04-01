@@ -120,6 +120,7 @@ def zero_sequence(arr):
 # @io.timeit
 def gen_pairs_vec(prot, decoy=True, pow=6, thres=0.2, db=None):
     import random
+
     np.random.seed(0)
     pairs = list(itertools.combinations(list(prot.keys()), 2))
     ppi = []
@@ -135,7 +136,6 @@ def gen_pairs_vec(prot, decoy=True, pow=6, thres=0.2, db=None):
     arrpos = arr.copy()
     arrpos[np.tril_indices(arrpos.shape[0], -1)] = 0
     # positive
-    print(np.where(arrpos > thres))
     pos = np.column_stack(np.where(arrpos > thres))
     pos = pd.DataFrame(pos)
     prot2 = {k: ",".join(map(str, v)) for k, v in prot.items()}

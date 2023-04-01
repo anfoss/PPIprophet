@@ -1,0 +1,2 @@
+Sample	cond	group	short_id	repl	fr
+./Input/test_pfd.txt	Ctrl	1	test	1	64

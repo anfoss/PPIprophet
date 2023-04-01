@@ -38,12 +38,6 @@ This will get you a working copy of PPIprophet into a folder called PPIprophet
 
 For usage of PPIprophet refers to the [PPIprophet_instructions.md](https://github.com/anfoss/PCprophet/blob/master/PCprophet_instructions.md)
 
-
-## Contributing
-
-Please read [CONTRIBUTE.md](https://github.com/anfoss/PCprophet/blob/master/CONTRIBUTE.md) for details on our code of conduct, and the process for submitting pull requests to us.
-
-
 ## Authors
 
 * **Andrea Fossati**  - [anfoss](https://github.com/anfoss) fossati@imsb.biol.ethz.ch

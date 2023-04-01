@@ -1,4 +1,0 @@
-Sample	cond	group	short_id	repl	fr
-./Input/2020_final_PFDN2_after_CCprofiler_Rep1.txt	Ctrl	1	PFDN2_1	1	75
-./Input/2020_final_PFDN2_after_CCprofiler_Rep2.txt	Ctrl	1	PFDN2_2	2	75
-./Input/2020_final_PFDN2_after_CCprofiler_Rep3.txt	Ctrl	1	PFDN2_2	3	75

@@ -122,7 +122,7 @@ class NetworkCombiner(object):
         # self.adj_matrx = self.desi_f(freq, self.adj_matrx)
         # convert to network and return
         # nodes are alphabetically ordered
-        self.comb_net = nx.from_numpy_matrix(self.adj_matrx)
+        self.comb_net = nx.from_numpy_array(self.adj_matrx)
         self.comb_net = nx.relabel_nodes(
             self.comb_net, dict(zip(self.comb_net.nodes, self.ids), copy=False)
         )
@@ -160,7 +160,7 @@ class NetworkCombiner(object):
         """
         convert self.adj_matrx to network using node ids
         """
-        G = nx.from_numpy_matrix(self.adj_matrx)
+        G = nx.from_numpy_array(self.adj_matrx)
         G = nx.relabel_nodes(G, dict(zip(G.nodes, self.ids)))
         return G
 
@@ -168,7 +168,7 @@ class NetworkCombiner(object):
 class TableConverter(object):
     """docstring for TableConverter"""
 
-    def __init__(self, table, cond):
+    def __init__(self, table, cond, fdr):
         super(TableConverter, self).__init__()
         self.table = table
         self.df = pd.read_csv(table, sep="\t")
@@ -176,7 +176,7 @@ class TableConverter(object):
         self.G = nx.Graph()
         self.adj = None
         # used 0.75 in paper
-        self.cutoff_fdr = 0.5
+        self.cutoff_fdr = float(fdr)
 
     def clean_name(self, col):
         self.df[col] = self.df[col].str.split("_").str[0]
@@ -224,7 +224,7 @@ class TableConverter(object):
             error_stat = qvalue.error_statistics(target, decoy)
             i0 = (error_stat.qvalue - self.cutoff_fdr).abs().idxmin()
             self.cutoff_fdr = error_stat.iloc[i0]["cutoff"]
-            print("cutoff for {} is {}".format(self.table, self.cutoff_fdr))
+            print("Probability cutoff for {} is {}".format(self.table, self.cutoff_fdr))
             # self.df = self.df[self.df['Prob'] >= self.cutoff_fdr]
             # 0s the probability below fdr thresholds
             self.df[self.df["Prob"] <= self.cutoff_fdr] = 10 ** -17
@@ -294,7 +294,7 @@ def estimate_background():
     pass
 
 
-def runner(tmp_, ids, outf, crapome):
+def runner(tmp_, ids, outf, crapome, fdr):
     """
     read folder tmp in directory.
     then loop for each file and create a combined file which contains all files
@@ -321,7 +321,7 @@ def runner(tmp_, ids, outf, crapome):
                 continue
             pred_out = os.path.join(smpl, "dnn.txt")
             grids.extend(list(pd.read_csv(fl, sep="\t")["GN"]))
-            exp = TableConverter(table=pred_out, cond=pred_out)
+            exp = TableConverter(table=pred_out, cond=pred_out, fdr=fdr)
             exp.fdr_control()
             exp.convert_to_network()
             exp.weight_adj_matrx(smpl, write=True)

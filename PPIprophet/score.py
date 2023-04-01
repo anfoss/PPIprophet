@@ -71,8 +71,10 @@ def plot_fdr(target, decoy, cutoff, fdr, plotname):
     ax3.set_position([box.x0, box.y0, box.width * 0.8, box.height])
 
     plt.tight_layout()
+    plt.show()
     plt.savefig(plotname, dpi=800, bbox_inches="tight")
     plt.close()
+    
     return True
 
 
@@ -190,7 +192,7 @@ def rec_mcl(adj_matrix):
 def optimize_mcl(matrix, results, clusters):
     newmax = 0
     infl = 2
-    for inflation in np.linspace(1.1, 5, 500):
+    for inflation in np.linspace(1.1, 10, 500):
         result = mcl.run_mcl(matrix, inflation=inflation)
         clusters = mcl.get_clusters(result)
         qscore = mcl.modularity(matrix=result, clusters=clusters)
@@ -295,7 +297,7 @@ def runner(tmp_, outf, crapome, thresh):
     clusters = rec_mcl(m)
     output_from_clusters(ids, clusters, outf)
     # m[m==0]=10**-17
-    # G = nx.from_numpy_matrix(m)
+    # G = nx.from_numpy_array(m)
     # # G = nx.relabel_nodes(G,dict(zip(G.nodes, ids)))
     # numeric_indices = [index for index in range(G.number_of_nodes())]
     # node_indices = sorted([node for node in G.nodes()])
@@ -303,7 +305,7 @@ def runner(tmp_, outf, crapome, thresh):
     # # print(G.edges(data=True))
     # # assert False
     # spl = karateclub.EgoNetSplitter(10)
-    # spl.fit(nx.from_numpy_matrix(m))
+    # spl.fit(nx.from_numpy_array(m))
     # out = {}
     # ids_d = dict(zip(range(0, len(ids)), ids))
     # for k, v in spl.get_memberships().items():
