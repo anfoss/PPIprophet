@@ -135,6 +135,7 @@ def gen_pairs_vec(prot, decoy=True, pow=6, thres=0.2, db=None):
     arrpos = arr.copy()
     arrpos[np.tril_indices(arrpos.shape[0], -1)] = 0
     # positive
+    print(np.where(arrpos > thres))
     pos = np.column_stack(np.where(arrpos > thres))
     pos = pd.DataFrame(pos)
     prot2 = {k: ",".join(map(str, v)) for k, v in prot.items()}
@@ -154,7 +155,6 @@ def gen_pairs_vec(prot, decoy=True, pow=6, thres=0.2, db=None):
     ft_pos = pos.replace(prot2)
     # here dropna
     pos["FT"] = ft_pos[0] + "#" + ft_pos[1]
-
     # decoys
     neg = np.column_stack(np.where(arr <= thres))
     # fishing pos.shape[0] decoys. maybe 2 decoys per protein is better?

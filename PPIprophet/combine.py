@@ -176,7 +176,7 @@ class TableConverter(object):
         self.G = nx.Graph()
         self.adj = None
         # used 0.75 in paper
-        self.cutoff_fdr = 1
+        self.cutoff_fdr = 0.5
 
     def clean_name(self, col):
         self.df[col] = self.df[col].str.split("_").str[0]
@@ -316,6 +316,7 @@ def runner(tmp_, ids, outf, crapome):
         for smpl in dir_:
             base = os.path.basename(os.path.normpath(smpl))
             fl = "./Input/{}.txt".format(base)
+            pass
             if not group_info["Sample"].str.contains(fl).any():
                 continue
             pred_out = os.path.join(smpl, "dnn.txt")
@@ -334,9 +335,7 @@ def runner(tmp_, ids, outf, crapome):
         gr_graphs.append(gr_exps.get_gr_network())
         gen_output(outf, v, gr_exps, crapome)
         allids.extend(grids)
-
     G2 = gr_graphs.pop()
-    mx = 0
     # here select max interaction score per ppi across baits
     for g in gr_graphs:
         for a, b, attrs in g.edges(data=True):
