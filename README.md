@@ -1,47 +1,135 @@
-# PPIprophet
+## PPIprophet instruction
 
-Software toolkit for analysis of affinity purified fractionated samples.
-PPIprophet is a port of https://github.com/anfoss/PCprophet
+After successfully installing all the dependencies, the following command can be directly run to test PPIprophet with the example dataset (i.e. test/test_fract.txt):
+```
+python3 main.py -sid test/test_ids.txt
+```
+The default input and output folders are '/test/' and '/Output/' respectively,
+under the PPIprophet working folder. It will generally take ~1 hr per file to
+finish but the computation time increases exponentially depending on the nr of
+protein ids in the file. We suggest to employ an high performance computing
+environment if submitting a whole proteome search and not an affinity purified sample.  
+
+In the PPIprophet package, all parameters can be configured either via the ‘ProphetConfig.conf’ file or via by running PPIprophet using the command. When running the PPIprophet, the parameters indicated in the command will be written into the ‘ProphetConfig.conf’ file. Generally, four types of features are needed:
 
 
-## Getting Started
+## Input file
 
-These instructions will get you a copy of the project up and running on your local machine and how to test the compatibility with your current Python packages
-### Prerequisites
+Input file need to be a wide format matrix with two essential columns:
 
-* [Python >=3.4.x](https://www.python.org)
-* [Sklearn 0.20.3](https://pypi.org/project/sklearn/)
-* [NetworkX v2.4](https://networkx.github.io)
-* [Pandas >0.23](https://pandas.pydata.org)
-* [Scipy >1.1.0](https://www.scipy.org)
-* [Tensorflow2](https://www.tensorflow.org/install/)
+__GN__ : Gene name or protein id, needs to be the first column. This is a
+unique identifier and having duplicate rows will trigger a DuplicateError from PPIprophet.
 
-### Installing
+Remaining columns needs to be ordered according to the fractionation scheme used. There is no strict requirement for column names apart from GN and ID, but they need to be ordered.
+All quantitation schemes commonly used in proteomics such as MS1 or MS2 ion-extracted chromatogram (XIC), spectral counts (SPCs) and TMT or SILAC ratios are supported.
 
-We recommend using [anaconda](https://www.anaconda.com) as it contains the majority of the required packages for PPIprophet.
-Igraph needs to be installed separately [here](https://igraph.org/python/)
-Tensorflow also requires separates installation [here](https://www.tensorflow.org)
+Examples of correct formatting are provided under test/test_fract.txt data.
 
-#### Command line version
+### Parameter setup
 
-Ensure that you have installed the GitHub tool and 'git-lfs' command specifically for large file transfer. Please see [here](https://gist.github.com/derhuerst/1b15ff4652a867391f03) for installing GitHub and [here](https://help.github.com/en/github/managing-large-files/installing-git-large-file-storage) for installing 'git-lfs' command.
+
+##### Global parameters:
 
 ```
-git clone https://github.com/anfoss/PPIprophet PPIprophet
+-output The output folder
+-sid  Sample identifier file
 ```
 
-This will get you a working copy of PPIprophet into a folder called PPIprophet
+##### Pre-processing parameters:
 
-> **note** for the command line version only Python3 and related package dependencies are necessary
+```
+-all  The number of fractions to use [1, X].
+-is_ppi Is the provided database a PPI network or a complex database
+-ma  Choose ‘all’ for using data-driven+database based hypothesis generation and ‘reference’ use only database derived complexes
 
-## Usage
+```
 
-For usage of PPIprophet refers to the [PPIprophet_instructions.md](https://github.com/anfoss/PCprophet/blob/master/PCprophet_instructions.md)
 
-## Authors
+##### Post-processing parameters:
 
-* **Andrea Fossati**  - [anfoss](https://github.com/anfoss) fossati@imsb.biol.ethz.ch
+```
+-fdr  False discovery rate for hypothesis 0 > FDR > 1
 
-## License
+```
 
-This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details
+
+all parameters can be inspected using
+
+```
+python3 main.py --help
+```
+
+---
+### Writing the experimental information file
+The file ‘sample_ids.txt’ stores the experimental information and needs to contain the following headers:
+
+| Sample     | cond      |group|short_id|repl|fr|
+| :----------| :---------| :---|:-------|:---|:-|
+
+- __Sample__ full path of the file intended to be processed
+- __cond__ condition name
+- __group__ group number (integer, needs to be 1 for control)
+- __short_id__ alternative id
+- __repl__ replicate number within the contiions
+- __fr__ number of fractions per file
+
+
+> **Note:**  In the ‘Sample’ column, please make sure that the content is identical with the testing file name (with the file extension). In the ‘cond’ column, if you have multiple conditions, please label them exactly as ‘Ctrl’, ‘Treat1’, and ‘Treat2’ etc. Failure to do so will cause problems when running PPIprophet.
+
+Here is an example of a complete table with two conditions and three replicates:
+
+| Sample     | cond      |group|short_id|repl|fr|
+| :----------| :----- |:-----|:-----|:-----|:-----|
+| ./Input/c1r1.txt     | Ctrl      |1|ipsc_2i_1|1|65|
+| ./Input/c1r2.txt     | Ctrl      |1|ipsc_2i_2|2|64|
+| ./Input/c1r3.txt     | Ctrl      |1|ipsc_2i_3|3|65|
+| ./Input/c2r1.txt     | Treat1      |2|ipsc_ra_1|1|65|
+| ./Input/c2r2.txt     | Treat1      |2|ipsc_ra_2|2|65|
+| ./Input/c2r3.txt     | Treat1      |2|ipsc_ra_3|3|65|
+
+
+
+---
+### Running PPIprophet
+
+PPIprophet can be using all default settings with
+
+
+```
+python3 main.py
+```
+
+
+----
+
+### Interpreting prediction results
+There will be two folders generated by the PPIprophet, including the ‘tmp’ folder and the user designated ‘Output’ folder. The ‘tmp’ folder stores all the intermediate files for PPIprophet to process and therefore can be used for debugging and validation. The ‘tmp’ folder can be safely deleted after PPIprophet finishes all the prediction and analysis. 
+
+The ‘Output’ folder, on the other hand, harboured all the output files generated by PPIprophet.
+
+In the output folder the following text files are present:
+
+- __adj_list.txt__: PPI list in the form proteinA/proteinB/Probability (from DNN prediction) and Crapome frequencies for both proteins.
+- __communities.txt__: Modules detected after MCL clustering of the modified WD scores.
+- __d_scores.txt__: Interaction probabilities converted to modified WD scores (see paper for mathematical description and derivation)
+- __probtot.txt__: adjacency list where proteins having interaction below the scored thresholds (at the user specified FDR) are zeroed. Users can find the full scored matrix (prior to FDR filtering) in tmp/dnn.txt
+- __prot_centr.txt__: Protein-centric output where for every protein entry all the identified interactors are concatenated.
+
+
+### Import results into Cytoscape
+
+Both __probtot.txt__,   __d_scores.txt__ are fully compatible with Cytoscape import without the need for any additional formatting. For additional mapping __adj_list.txt__ can be used to visualize frequency of interactions in crapome.
+
+### PPIprophet specific exceptions and errors
+
+Depending on the error raised different fixes are needed.
+
+- __NaRowError / NaInMatrixError__: There are 'NA' values in the input matrix, substitute them with 0
+- __MissingColumnError__: Identifier columns (GN or ID) are missing
+- __DuplicateRowError / DuplicateIdentifierError__: There are duplicates in the GN column. A common cause of this is mapping of isoform to the same gene name. Just add \_1 to one of the duplicate gene names
+- __EmptyColumnError__: A column is only NA
+
+*Note* for imputing column values in case of different number of fractions add a full 0 column
+
+### Contact
+Please refer to [README.md](https://github.com/fossatiA/PPIprophet/blob/master/README.md) for how to contact us.
