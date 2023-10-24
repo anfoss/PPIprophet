@@ -1,27 +1,43 @@
 ## PPIprophet instruction
 
-After successfully installing all the dependencies, the following command can be directly run to test PPIprophet with the example dataset (i.e. test/test_fract.txt):
+After successfully installing all the dependencies, the following command can
+be directly run to test PPIprophet with the example dataset
+
 ```
-python3 main.py -sid test/test_ids.txt -is_ppi False -db coreComplexes.txt
+python3 main.py -sid test/test_ids.txt
 ```
+
 The default input and output folders are '/test/' and '/Output/' respectively,
 under the PPIprophet working folder. It will generally take ~1 hr per file to
 finish but the computation time increases exponentially depending on the nr of
-protein ids in the file. We suggest to employ an high performance computing
-environment if submitting a whole proteome search and not an affinity purified sample.  
+protein ids in the file.
 
-In the PPIprophet package, all parameters can be configured either via the ‘ProphetConfig.conf’ file or via by running PPIprophet using the command. When running the PPIprophet, the parameters indicated in the command will be written into the ‘ProphetConfig.conf’ file. Generally, four types of features are needed:
+**We don't recommend submitting a global co-fractionation MS experiment due to
+the exponential increase in computation resources and time needed for analysis
+and the assumption of our FDR and WD score filters**.  
+
+In the PPIprophet package, all parameters can be configured either via the
+‘ProphetConfig.conf’ file or via by running PPIprophet using the command line. 
+When running the PPIprophet, the parameters indicated in the command will be written
+into the ‘ProphetConfig.conf’ file. Generally, four types of features are
+needed:
 
 
 ## Input file
 
-Input file need to be a wide format matrix with two essential columns:
+Input file need to be a wide format matrix with one essential columns:
 
 __GN__ : Gene name or protein id, needs to be the first column. This is a
 unique identifier and having duplicate rows will trigger a DuplicateError from PPIprophet.
 
-Remaining columns needs to be ordered according to the fractionation scheme used. There is no strict requirement for column names apart from GN and ID, but they need to be ordered.
-All quantitation schemes commonly used in proteomics such as MS1 or MS2 ion-extracted chromatogram (XIC), spectral counts (SPCs) and TMT or SILAC ratios are supported.
+Remaining columns needs to be ordered according to the fractionation scheme used. There is no strict requirement for column names apart from GN, but they need to be ordered.
+All quantitation schemes commonly used in proteomics such as MS1 or MS2
+ion-extracted chromatogram (XIC), spectral counts (SPCs) and TMT or SILAC
+ratios are supported.
+
+___We recommend acquiring the dataset using DIA-MS as it provides the best
+balance between protein identification depth, consistency of peptide
+identification and quantification accuracy___
 
 Examples of correct formatting are provided under test/test_fract.txt data.
 
@@ -31,72 +47,21 @@ Examples of correct formatting are provided under test/test_fract.txt data.
 ##### Global parameters:
 
 ```
--output The output folder
--sid  Sample identifier file
--cal  Calibration file (no headers)
--mw_uniprot Gene names to molecular mass
--db Database (either in CORUM format or STRING format)
+-out The output folder (default 'Output')
+-sid  Sample identifier file (default sample_ids.txt)
+-fdr  False discovery rate threshold (default 0.5)
+-crapome Crapome file or equivalent contaminant database (default crapome.org.txt)
+-tresh Frequency threshold for crapome filtering (default 0.5)
+-db Database (STRING format)
 ```
 
-**Note:** -db can be either a protein-protein interaction network or a complex database but it __always needs to be provided__.
-
-The CORUM-link database can be user provided but as minimal requirement needs to have the following columns
-
-- *ComplexID* unique numeric identifier
-- *ComplexName* complex identifier
-- *subunits(Gene name)* ; separated list of __gene names__ for the corresponding complex
-
-Examples for this format can be downloaded from [CORUM](http://mips.helmholtz-muenchen.de/corum/#download).
-
-In case of PPI database the format needs to be
+In case of using a PPI database, the format needs to be
 
 |ProtA|ProtB|
 |:----|:----|
 |A    |B    |
 |D    |A    |
 |C    |E    |
-
-In this case a Markov clustering is first performed to generate putative complexes which are then used for FDR control. PPI derived complexes are characterized by the identifier ppi__nr where nr stands for the cluster number from the Markov cluster.
-
-##### Pre-processing parameters:
-
-```
--all  The number of fractions to use [1, X].
--is_ppi Is the provided database a PPI network or a complex database
--ma  Choose ‘all’ for using data-driven+database based hypothesis generation and ‘reference’ use only database derived complexes
-
-```
-
-
-##### Post-processing parameters:
-
-```
--co Mode for collapsing hypothesis to common complexes
--fdr  False discovery rate for hypothesis 0 > FDR > 1
-
-```
-
-**-co flag in depth** Due to the redundant nature of the complexes generated by hypothesis generation is necessary to collapse positives into single complex. The following is an example and description of the parameter:
-
-| Members   | GO Score  |Prediction probability|# Members|Estimated MW |
-|:----------|:----------|:---------------------|:--------|:------------|
-|A,B        |0.6        |0.75                  |2        |90000        |
-|A,B,C      |0.4        |0.6                   |3        |190000       |
-|A,B,C,D    |0.3        |0.9                   |4        |250000       |
-
-**-co GO** Selects the complex with the highest Go score per dendogram branch  (A,B)
-
-**-co PROB** Selects the complex with the highest probability per dendogram branch (A,B,C,D)
-
-**-co SUPER** Selects the complex with the highest number of members (superset) per dendrogram branch (A,B,C,D)
-
-**-co CAL** Extrapolates the molecular weight from the apex peak for the reported complex using the calibration provided. Then selects the complex with the closer mass to the theoretical weight. If for example extrapolated MW for these set of complexes is 200000 Da then A,B,C will be selected
-
-To use CAL it is necessary to pass also the mw_uniprot flag. Just add 'Mass' as a column in uniprot and export in tab format and rename to .txt.
-___There are two columns which are needed 'Gene names' which holds your identifiers (whether real gene names or protein accession) and 'Mass' which contains all masses as , separated numbers___
-
-
-> **Note:** __We recommend using collapsing based on calibration curve and molecular weight as this enforces the correct mass distribution but ONLY if a calibration curve covering all molecular weight range of the column is available. Extrapolation outside the standard leads to wrong molecular weight estimation__
 
 
 All of the above parameters have the following default settings
@@ -106,16 +71,11 @@ All of the above parameters have the following default settings
 | :--------------| :-----------------|:-------------------------------------|
 | -output        | './Output'        |any                                   |
 | -sid           | './sample_ids.txt'|any                                   |
-| -cal           | None              |any                                   |
-| -mw_uniprot    | None              |any                                   |
-| -all           | 'all'             |[1>x>number of fractions, 'all']      |
-| -is_ppi        | 'False'           |[True, False]                         |
-| -ma            | 'all'             |['all', 'reference']                  |
-| -co            | 'GO'              |['GO','SUPER','CAL','eCAL','PROB' 'NONE']|
-| -fdr           | 0.5               |0>x>1                                 |
-| -mult          | False             | [True, False]                        |
-| -v             | True              | [True, False]                        |
-| -skip          | False             | [True, False]                        |
+| -fdr           | 0.3               |0-1                                   |
+| -crapome       | 'crapome.org.txt' |any      |
+| -thresh        | 0.5               |0-1                                |
+| -db            | None               |any                               |
+
 
 
 all parameters can be inspected using
@@ -139,7 +99,7 @@ The file ‘sample_ids.txt’ stores the experimental information and needs to c
 - __fr__ number of fractions per file
 
 
-> **Note:**  In the ‘Sample’ column, please make sure that the content is identical with the testing file name (with the file extension). In the ‘cond’ column, if you have multiple conditions, please label them exactly as ‘Ctrl’, ‘Treat1’, and ‘Treat2’ etc. Failure to do so will cause problems when running PPIprophet.
+> **Note:**  In the ‘Sample’ column, please make sure that the content is identical with the testing file name (with the file extension).
 
 Here is an example of a complete table with two conditions and three replicates:
 
@@ -153,12 +113,6 @@ Here is an example of a complete table with two conditions and three replicates:
 | ./Input/c2r3.txt     | Treat1      |2|ipsc_ra_3|3|65|
 
 
-
-
-> **Note:**  __Differential analysis will be performed *automatically* if the sample_ids.txt file contains more than one group__
-
-
-
 ---
 ### Running PPIprophet
 
@@ -169,90 +123,34 @@ PPIprophet can be using all default settings with
 python3 main.py
 ```
 
-Parameters can be individually set, for example using an interaction network instead of a complex database
+Parameters can be individually set, for example using an interaction network
+and a 10% false discovery rate
 
 ```
-python3 main.py -db myppi.txt -is_ppi True
+python3 main.py -db myppi.txt -fdr 0.1
 ```
-
-
 
 ----
 
 ### Interpreting prediction results
-There will be two folders generated by the PPIprophet, including the ‘tmp’ folder and the user designated ‘Output’ folder. The ‘tmp’ folder stores all the intermediate files for PPIprophet to process and therefore can be used for debugging and validation. The ‘tmp’ folder can be safely deleted after PPIprophet finishes all the prediction and analysis. The ‘Output’ folder, on the other hand, harboured all the output files, results and plots generated by PPIprophet.
+There will be two folders generated by the PPIprophet, including the ‘tmp’
+folder and the user designated ‘Output’ folder. The ‘tmp’ folder stores all the
+intermediate files for PPIprophet to process and therefore can be used for
+debugging and validation. The ‘tmp’ folder can be safely deleted after
+PPIprophet finishes all the prediction and analysis.
 
 In the output folder the following text files are present:
 
-- __ComplexReport.txt__: All the predicted results, including positive and negative complexes. For positive predictions, we also mapped them to the database provided with the -db parameter to see if they have been documented. If they have been documented, we label them as ‘Reported’; otherwise, they are labelled as ‘Novel’.
-- __PPIReport.txt__: Protein-protein interaction network generated from positive complexes. Suitable as input for network visualization tools such as Cytoscape.
+- **adj_list.txt_test**: Adjacency list for the protein-protein interaction network
+- **prot_tot_test.txt**: FDR-filtered protein-protein interaction network in a
+  Cytoscape compatible format. The weight column is the prediction confidence.
+  All tested protein pairs are reported but only positive predicted and
+  FDR-filtered interactions have a weight value.
+- **communities.txt**: Protein communities derived from the interaction network
+- **d_scores.txt**: Modified WD scores for all interactions
+- **prot_centr_test.txt**: Protein-centric view of the interactions. Each 'bait'
+  protein has all identified interactions
 
-In case differential analysis was performed two additional text files and one folder are going to be present.
-
-- __DifferentialComplexReport.txt__: Complex-level differential analysis, where complexes are scored based on the Baysean factors for the individual proteins.
-
-- __DifferentialProteinReport.txt__: Protein-level differential analysis, where the Baysean probability difference between each condition is reported.
-
-
-- __Differential__: Differential delta plot of intensity between every condition and control. A flat line represents no difference between control and condition. A positive peak represents an increase in the control; while a negative peak represents an increase in the condition (right Y axis).
-
-
-PPIprophet generates the following QC plots
-
-
-- __FalseDiscoveryRate.pdf__: an FDR plot where the positive hypotheses are filtered to control for false discovery rate using the positive complexes database provided. If not provided a fixed threshold of 0.5 is used.
-
-- __RecallDatabase.pdf__: % of positive predicted complexes on the total size of the database provided.
-
-One folder for each __short_id__ will be generated. Within that folder all the positive and negative complexes from the database  are plotted together with the novel positive complexes identified by PPIprophet
-
-
-### Import results into Cytoscape
-
-Both __PPIReport.txt__ and  __ppi_network.GraphML__ are fully compatible with Cytoscape import without the need for any additional formatting. For additional mapping __DifferentialProteinReport.txt__ can be used to visualize which proteins are differential in the network and which complexes are perturbed
-
-### PPIprophet specific exceptions and errors
-
-Depending on the error raised different fixes are needed.
-
-- __NaRowError / NaInMatrixError__: There are 'NA' values in the input matrix, substitute them with 0
-- __MissingColumnError__: Identifier columns (GN or ID) are missing
-- __DuplicateRowError / DuplicateIdentifierError__: There are duplicates in the GN column. A common cause of this is mapping of isoform to the same gene name. Just add \_1 to one of the duplicate gene names
-- __EmptyColumnError__: A column is only NA
-
-*Note* for imputing column values in case of different number of fractions add a full 0 column
-
-
-### FAQ and solution to common problems
-
-* __Why in ComplexReport.txt the complexID has several complexes concatenated by # ?__ We are using the parsimony principle, thereby complexes for which there are not enough evidence (i.e with the same subunits identified across the experiment) are reported in the same complex group
-
-
-* __I want to search with several different FDR and collapse method but it took long time to generate the features__ The modular organization of PPIprophet makes it easy to skip certain modules. The ___-skip___ flag allows to skip feature generation and go straight to the complex combination and collapsing step.
-For example re-run with FDR of 50%.
-
-```
-python3 main.py -skip True -fdr 0.5
-
-```
-
-
-* __-CAL flag for collapsing returns an error__! Check that the format of the calibration file. __A correctly formatted calibration file will have the fraction first as integer and the molecular weight in KDa as integer__
-
-| | | |
-|-|-|-|
-|15| 1398 |
-|24| 699 |
-|31| 300 |
-|39| 150 |
-|47| 44 |
-|53| 17 |
-
-> **Note:**  Be sure to pass __ALSO__ the -mw_uniprot flag with a link to the appropriate file
-
-* __-eCAL returns NotImplementedExceptions__ We are currently working on a MW weight free collapsing procedure where the calibration file is used without the -mw_uniprot flag. We decided to give as options to motivate us developing it fast!
-
-* -__FalseDiscoveryRate.pdf looks weird__ This FDR plot is across GO score. Thereby we expect lower FDR with increase of GO score. However, as caveat depending on the database used and the complex identified within the database the FDR will vary greatly. For example a CORUM FDR of 0.75 corresponds approximately to a STRING FDR or 0.2.
 
 ### Contact
 Please refer to [README.md](https://github.com/fossatiA/PPIprophet/blob/master/README.md) for how to contact us.
