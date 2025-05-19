@@ -353,7 +353,7 @@ def uniqueid():
     sft = datetime.strftime
     old_time = mynow()
     seed_range_bits = 14  # max range for seed
-    seed_max_value = 2 ** seed_range_bits - 1
+    seed_max_value = 2**seed_range_bits - 1
     seed = random.getrandbits(seed_range_bits)
     current_seed = str(seed)
     current_time = mynow()
@@ -418,6 +418,7 @@ def prepare_feat(feat, thresh=1, dropw=["W", "SHFT"]):
     feat2 = feat[["SHFT", "W"]]
     feat_num = pd.concat([feat2, cor, dif], axis=1)
     feat_num.replace(to_replace=missing, value=np.nan, inplace=True)
+    feat_num = feat_num.infer_objects(copy=False) 
     # remove nan
     feat_num = feat_num.astype(np.float64)
     feat_num.drop(dropw, axis=1, inplace=True)

@@ -68,7 +68,7 @@ def expand(matrix, power):
     :returns: The expanded matrix
     """
     if isspmatrix(matrix):
-        return matrix ** power
+        return matrix**power
 
     return np.linalg.matrix_power(matrix, power)
 

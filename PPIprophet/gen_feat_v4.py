@@ -15,7 +15,30 @@ import PPIprophet.stats_ as st
 
 class ProteinProfile(object):
     """
-    docstring for ProteinProfile
+    ProteinProfile represents a protein's intensity profile and provides methods for peak detection.
+
+    Attributes:
+        acc (str): The accession identifier for the protein.
+        inten (np.ndarray): The intensity values for the protein profile, converted to a NumPy array of floats.
+        peaks (list): List of detected peak indices in the intensity profile.
+
+    Methods:
+        __init__(acc, inten):
+            Initializes the ProteinProfile with an accession and intensity values.
+
+        get_inte():
+            Returns the intensity profile as a NumPy array.
+
+        get_acc():
+            Returns the protein accession identifier.
+
+        get_peaks():
+            Returns the list of detected peak indices.
+
+        calc_peaks(pick=True):
+            Detects peaks in the intensity profile.
+            If pick is True, uses st.peak_picking to find peaks.
+            If pick is False, uses the index of the maximum intensity as the peak.
     """
 
     def __init__(self, acc, inten):
@@ -46,8 +69,64 @@ class ProteinProfile(object):
 
 class ComplexProfile(object):
     """
-    docstring for ComplexProfile
-    formed by a list of ProteinProfile
+    Represents a protein complex profile, encapsulating its members and various computed features.
+
+    Attributes:
+        name (str): Name of the complex.
+        members (list): List of protein member objects.
+        pks (dict): Dictionary of peak information for each member.
+        width (float or None): Width of the complex, typically computed as mean FWHM.
+        shifts (float or None): Absolute shift between aligned peaks of members.
+        cor (list): List of correlation values between member profiles.
+        diff (list): List of differences between member intensity profiles.
+        pks_ali (dict): Dictionary of aligned peak positions for each member.
+        yhat_probs (Any): Placeholder for predicted probabilities (if used).
+
+    Methods:
+        __init__(name):
+            Initializes a ComplexProfile with the given name.
+
+        add_member(prot):
+            Adds a protein member to the complex.
+
+        get_members():
+            Returns a list of accession numbers for all members.
+
+        get_name():
+            Returns the name of the complex.
+
+        create_matrix():
+            Creates a 2D numpy array of intensity profiles for all members.
+
+        get_peaks():
+            Yields formatted rows containing peak information for each member.
+
+        format_ids(deli="#"):
+            Returns a string identifier for the complex by concatenating member accessions.
+
+        test():
+            Placeholder for correlation-based test between members. Returns True.
+
+        calc_corr(pairs, W=10):
+            Calculates vectorized correlation between two member profiles using a sliding window.
+
+        align_peaks(skip=100):
+            Aligns peaks of all protein members and updates peak information.
+
+        pairwise():
+            Performs pairwise comparison between two members, calculating correlation, difference, and shift.
+
+        calc_shift(ids):
+            Calculates the absolute shift between aligned peaks of two members.
+
+        calc_diff(p1, p2):
+            Calculates the absolute difference between intensity profiles of two members.
+
+        calc_width():
+            Computes the width of the complex (currently set to a constant).
+
+        create_row():
+            Aggregates all computed features into a single output row for prediction.
     """
 
     def __init__(self, name):
@@ -74,7 +153,12 @@ class ComplexProfile(object):
 
     def create_matrix(self):
         """
-        create numpy 2d array for vectorization
+        Creates a 2D NumPy array by extracting integer representations from each member.
+
+        Returns:
+            np.ndarray: A 2D array where each row corresponds to the integer representation
+            of a member in the `self.members` list, as obtained by calling their `get_inte()` method.
+
         """
         arr = [x.get_inte() for x in self.members]
         return np.array(arr)
@@ -106,7 +190,28 @@ class ComplexProfile(object):
 
     def calc_corr(self, pairs, W=10):
         """
-        vectorized correlation between pairs vectors with sliding window
+        Compute the sliding window Pearson correlation between two input vectors.
+
+        This method calculates the correlation between two vectors (obtained from the `get_inte()` method of the objects in `pairs`)
+        using a sliding window of length `W`. The correlation is computed in a vectorized manner for efficiency.
+
+        Parameters
+        ----------
+        pairs : tuple or list of objects
+            A tuple or list containing two objects, each implementing a `get_inte()` method that returns a 1D numpy array.
+        W : int, optional
+            The window length for the sliding window correlation (default is 10).
+
+        Notes
+        -----
+        - The method applies a uniform filter to smooth the input vectors before computing the correlation.
+        - The correlation is computed for each window position, and the result is stored in `self.cor`.
+        - The output is padded with NaNs to reach a fixed length of 72.
+
+        Returns
+        -------
+        None
+            The result is stored in the instance variable `self.cor` as a 1D numpy array.
         """
         tmp = []
         a, b = pairs[0].get_inte(), pairs[1].get_inte()
@@ -136,7 +241,7 @@ class ComplexProfile(object):
         # add np.nan to reach 72
         self.cor = np.hstack((D / np.sqrt(ssAs * ssBs), np.zeros(9) + np.nan))
 
-    def align_peaks(self, skip=100):
+    def align_peaks(self):
         """
         align all protein peaks
         """
@@ -197,8 +302,15 @@ class ComplexProfile(object):
         cor_conc = ",".join([str(x) for x in self.cor])
         row_id = self.get_name()
         members = self.format_ids()
-        #
-        return [row_id, members, cor_conc, self.shifts, dif_conc, self.width]
+        return pd.Series({
+            "ID": row_id,
+            "MB": members,
+            "COR": cor_conc,
+            "SHFT": self.shifts,
+            "DIF": dif_conc,
+            "W": self.width
+        })
+
 
 
 def add_top(result, item):
@@ -222,6 +334,27 @@ def minimize(solution):
 
 
 def min_sd(aoa):
+    """
+    Aligns lists of peaks, pads them to equal length, and selects the set of peaks (one from each list)
+    corresponding to the column with the minimum standard deviation.
+
+    Parameters
+    ----------
+    aoa : list of list
+        A list of lists, where each inner list contains peak values (can include None).
+
+    Returns
+    -------
+    list
+        A list containing one peak value from each input list, selected such that the set has the minimum
+        standard deviation among all possible aligned columns. If no valid peaks are found, returns None.
+
+    Notes
+    -----
+    - None values are filtered out from each inner list before alignment.
+    - Shorter lists are padded by repeating their last value to match the length of the longest list.
+    - If an inner list is empty after filtering, None is appended for that position in the result.
+    """
     rf_pk = []
     for v in aoa:
         rf_pk.append([x for x in v if x is not None])
@@ -256,6 +389,21 @@ def min_sd(aoa):
 
 
 def shortest_path(aoa, max_trial=100):
+    """
+    Finds the shortest path through a list of lists (aoa), where each sublist represents possible choices at each step.
+    The function attempts to build a path by selecting one element from each sublist, minimizing a cost function at each step.
+
+    Args:
+        aoa (list of list): A list of lists, where each inner list contains possible elements to choose from at each step.
+        max_trial (int, optional): The maximum number of iterations to attempt before giving up. Defaults to 100.
+
+    Returns:
+        list or None: A list representing the shortest path found (one element from each sublist in aoa), or None if no solution is found within max_trial attempts.
+
+    Notes:
+        - The function relies on external functions `minimize` (to compute the cost of a path) and `add_top` (to insert new paths into the result list).
+        - The function uses a greedy approach, always expanding the current best partial solution.
+    """
     elements = len(aoa)
     result = [[[x], 0] for x in aoa[0]]
     trial = 1
@@ -277,6 +425,23 @@ def shortest_path(aoa, max_trial=100):
 
 
 def alligner(aoa):
+    """
+    Aligns a list of lists by finding the closest matching points across all sublists.
+
+    Parameters:
+        aoa (list of list of int/float): A list containing sublists of numerical values.
+
+    Returns:
+        list or None:
+            - If any sublist is empty, returns None.
+            - If there is at least one common element across all sublists, returns a list where each element is the maximum common value, repeated for the length of aoa.
+            - Otherwise, attempts to align using the `shortest_path` function. If successful, returns its result.
+            - If `shortest_path` fails, aligns using the `min_sd` function and returns its result.
+
+    Notes:
+        - The function assumes the existence of `shortest_path` and `min_sd` helper functions.
+        - The alignment strategy prioritizes exact matches, then optimal paths, then minimal standard deviation.
+    """
     """Finds closest points of a list of lists"""
     # one of arrays is empty
     for x in aoa:
@@ -323,7 +488,14 @@ def gen_feat(s):
         cmplx.pairwise()
         return cmplx.create_row()
     else:
-        pass
+        return pd.Series({
+            "ID": str(0),
+            "MB": str(0),
+            "COR": str(0),
+            "SHFT": str(0),
+            "DIF": str(0),
+            "W": str(0)
+        })
 
 
 def process_slice(df):
@@ -346,12 +518,17 @@ def mp_cmplx(filename):
     print("calculating features for " + filename)
     df = pd.read_csv(filename, sep="\t")
     sd = dd.from_pandas(df, npartitions=8)
-    feats = pd.DataFrame(
-        sd.map_partitions(lambda df: process_slice(df), meta=(None, "object"))
-        .compute(scheduler="processes")
-        .values.tolist()
-    )
-    feats.columns = ["ID", "MB", "COR", "SHFT", "DIF", "W"]
+
+    meta = pd.DataFrame({
+        "ID": pd.Series(dtype='str'),
+        "MB": pd.Series(dtype='str'),
+        "COR": pd.Series(dtype='str'),
+        "SHFT": pd.Series(dtype='int'),
+        "DIF": pd.Series(dtype='str'),
+        "W": pd.Series(dtype='int')
+    })
+
+    feats = sd.map_partitions(process_slice, meta=meta).compute()
     return feats
 
 
@@ -363,5 +540,5 @@ def runner(base):
     cmplx_comb = os.path.join(base, "ppi.txt")
     print(os.path.dirname(os.path.realpath(__file__)))
     wr = mp_cmplx(filename=cmplx_comb)
-    feature_path = os.path.join(base, "mp_feat_norm.txt")
-    wr.to_csv(feature_path, sep="\t")
+    wr = wr[wr['ID'] != '0']
+    wr.to_csv(os.path.join(base, "mp_feat_norm.txt"), sep="\t")

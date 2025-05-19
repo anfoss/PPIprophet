@@ -20,10 +20,22 @@ from PPIprophet import qvalue as qvalue
 
 class NetworkCombiner(object):
     """
-    Combine all replicates for a single condition into a network
-    returns a network
-    """
+    NetworkCombiner Class
 
+    This class is designed to combine multiple replicate networks for a single condition into a single network. 
+    It provides methods for adding experiments, creating dataframes, combining graphs, calculating probabilities, 
+    and generating adjacency matrices and frequency matrices.
+
+    Attributes:
+        exps (list): A list of experiment objects to be combined.
+        adj_matrx (numpy.ndarray): The combined adjacency matrix.
+        networks (list): A list of individual network graphs.
+        dfs (list): A list of dataframes corresponding to the experiments.
+        ids (list): A sorted list of node IDs.
+        combined (pandas.DataFrame): A combined dataframe of probabilities.
+        combine (str): The method used for combining networks. Default is "prob".
+        comb_net (networkx.Graph): The combined network graph.
+    """
     def __init__(self):
         super(NetworkCombiner, self).__init__()
         self.exps = []
@@ -44,6 +56,15 @@ class NetworkCombiner(object):
 
     def combine_graphs(self, ids_all):
         """
+        Combines graphs by filling them with all proteins that are missing 
+        and assigning a weight of 0 (indicating no connection).
+
+        Args:
+            ids_all (list): A list of all protein identifiers to ensure 
+                            all graphs are filled with the same set of proteins.
+
+        Returns:
+            bool: Always returns True to indicate the operation was completed.
         fill graphs with all proteins missing and weight 0 (i.e no connection)
         """
         self.networks = [x.fill_graph(ids_all) for x in self.exps]
@@ -51,7 +72,17 @@ class NetworkCombiner(object):
 
     def multi_prob_out(self):
         """
-        print output in the format of prota and protb with probabilities per file
+        Combines edge probabilities from multiple network graphs into a single DataFrame.
+
+        This method processes a list of network graphs, extracts their edge lists with 
+        associated weights, and combines them into a unified DataFrame. The resulting 
+        DataFrame contains all edges from the input graphs, with probabilities merged 
+        across the graphs.
+
+        Returns:
+            pandas.DataFrame: A DataFrame with columns ["source", "target", "weight1", "weight2", ...],
+            where "source" and "target" represent the nodes of an edge, and "weightX" represents 
+            the edge weight (probability) from the X-th graph. Rows with all NaN weights are dropped.
         """
         allprobs = []
         for G in self.networks:
@@ -67,14 +98,25 @@ class NetworkCombiner(object):
         )
         # replace interactions with all NAN to 0
         tots.set_index(["source", "target"])
-        tots = tots.replace(10 ** -17, np.nan)
+        tots = tots.replace(10**-17, np.nan)
         tots.dropna(how="all", axis=0, inplace=True)
         return tots
 
     def calc_freq(self, all_adj):
         """
-        return a frequency matrix for positive interactions
+        Calculate the frequency matrix from a list of adjacency matrices.
+        This method processes a list of adjacency matrices, binarizes them based on a threshold 
+        (values >= 0.5 are set to 1, others to 0), and computes the frequency of connections 
+        across all matrices.
+        Args:
+            all_adj (list of numpy.ndarray): A list of adjacency matrices where each matrix 
+                                             is a 2D numpy array.
+        Returns:
+            numpy.ndarray: A 2D numpy array representing the frequency matrix, where each 
+                           element is the mean value of the corresponding elements across 
+                           the binarized adjacency matrices.
         """
+
         all_adj = [np.where(x >= 0.5, 1, 0) for x in all_adj]
         # here we sum them all
         outm = np.zeros(all_adj[0].shape, dtype=np.int64)
@@ -94,9 +136,22 @@ class NetworkCombiner(object):
 
     def adj_matrix_multi(self):
         """
-        add sparse adj matrix to the adj_matrix container
-        need to be done per group
-        """
+        Combines adjacency matrices from multiple networks based on the specified combination method.
+        This method processes a list of networks, extracts their adjacency matrices, and combines them
+        using one of the following methods:
+        - "prob": Takes the element-wise maximum of all adjacency matrices.
+        - "comb": Multiplies the probabilities element-wise across all adjacency matrices.
+        - "mean": Computes the element-wise mean of all adjacency matrices.
+        The resulting combined adjacency matrix is then converted into a networkx graph.
+        Returns:
+            numpy.ndarray: The combined adjacency matrix.
+        Attributes:
+            self.ids (list): A sorted list of node identifiers, ensuring consistent node order across networks.
+            self.networks (list): A list of networkx graphs to be combined.
+            self.combine (str): The method used to combine adjacency matrices ("prob", "comb", or "mean").
+            self.adj_matrx (numpy.ndarray): The resulting combined adjacency matrix.
+            self.comb_net (networkx.Graph): The resulting combined networkx graph.
+        """        
         all_adj = []
         # enforce same order
         self.ids = sorted(list(map(str, self.networks[0].nodes())))
@@ -166,17 +221,53 @@ class NetworkCombiner(object):
 
 
 class TableConverter(object):
-    """docstring for TableConverter"""
+    """
+    TableConverter is a utility class for converting protein-protein interaction tables into network representations,
+    applying FDR control, and generating adjacency matrices for downstream analysis.
 
-    def __init__(self, table, cond, fdr):
+    Attributes:
+        df (pd.DataFrame): Input dataframe containing protein interaction data.
+        cond (str): Experimental condition o.
+        G (networkx.Graph): Graph representation of the protein interactions.
+        adj (np.ndarray): Weighted adjacency matrix of the graph.
+        cutoff_fdr (float): False discovery rate cutoff for filtering interactions.
+
+    Methods:
+        __init__(df, cond, fdr):
+            Initializes the TableConverter with a dataframe, condition, and FDR cutoff.
+
+        clean_name(col):
+            Cleans protein names in the specified column by removing suffixes after underscores.
+
+        convert_to_network():
+            Converts the dataframe into a networkx Graph, adding edges with weights.
+
+        fill_graph(ids, w=10**-17):
+            Ensures the graph is fully connected by adding missing edges with a small weight.
+
+        weight_adj_matrx(path, write=True):
+            Generates and optionally writes the weighted adjacency matrix of the graph to a file.
+
+        fdr_control(plot=True):
+            Applies FDR control to filter interactions based on probability and writes error statistics.
+
+        get_adj_matrx():
+            Returns the weighted adjacency matrix.
+
+        get_df():
+            Returns the filtered dataframe.
+    """
+
+    def __init__(self, path, df, cond, fdr, cutoff_fdr=0.75):
         super(TableConverter, self).__init__()
-        self.table = table
-        self.df = pd.read_csv(table, sep="\t")
+        self.table = path
+        self.df = df        
         self.cond = cond
         self.G = nx.Graph()
         self.adj = None
         # used 0.75 in paper
-        self.cutoff_fdr = float(fdr)
+        self.fdr = float(fdr)
+        self.cutoff_fdr = 0.75
 
     def clean_name(self, col):
         self.df[col] = self.df[col].str.split("_").str[0]
@@ -188,7 +279,7 @@ class TableConverter(object):
             self.G.add_edge(row[1], row[2], weight=row[3])
         return True
 
-    def fill_graph(self, ids, w=10 ** -17):
+    def fill_graph(self, ids, w=10**-17):
         G2 = fully_connected(ids)
         [
             self.G.add_edge(*p, weight=w)
@@ -215,19 +306,18 @@ class TableConverter(object):
             np.savetxt(nm, self.adj, delimiter="\t")
         return True
 
-    # used 0.75 for paper and no split in preprocess
     def fdr_control(self, plot=True):
         self.df = self.df[self.df["Prob"] >= 0.5]
-        if self.cutoff_fdr < 1:
+        if self.fdr < 1:
             decoy = self.df[self.df["isdecoy"] == "DECOY"]["Prob"].values
             target = self.df[self.df["isdecoy"] == "TARGET"]["Prob"].values
             error_stat = qvalue.error_statistics(target, decoy)
-            i0 = (error_stat.qvalue - self.cutoff_fdr).abs().idxmin()
+            i0 = (error_stat.qvalue - self.fdr).abs().idxmin()
             self.cutoff_fdr = error_stat.iloc[i0]["cutoff"]
-            print("Probability cutoff for {} is {}".format(self.table, self.cutoff_fdr))
+            print("Probability cutoff for reaching {} FDR in {} is {}".format(self.fdr, self.table, self.cutoff_fdr))
             # self.df = self.df[self.df['Prob'] >= self.cutoff_fdr]
             # 0s the probability below fdr thresholds
-            self.df[self.df["Prob"] <= self.cutoff_fdr] = 10 ** -17
+            self.df[self.df["Prob"] <= self.cutoff_fdr] = 10**-17
             self.df = self.df[self.df["isdecoy"] == "TARGET"]
             pth = os.path.dirname(os.path.abspath(self.table))
             error_stat.to_csv("{}/error_metrics.txt".format(pth), sep="\t")
@@ -241,7 +331,7 @@ class TableConverter(object):
         return self.df
 
 
-def fully_connected(l, w=10 ** -17):
+def fully_connected(l, w=10**-17):
     G = nx.Graph()
     [G.add_edge(u, q, weight=w) for u, q in itertools.combinations(l, 2)]
     return G
@@ -258,7 +348,7 @@ def label_inte(subs):
         return "No interaction"
 
 
-def gen_output(outf, group, exps, crapome):
+def gen_output(outf, group, exps):
 
     # protA protB format
     outname = os.path.join(outf, "adj_list_{}.txt".format(group))
@@ -266,9 +356,6 @@ def gen_output(outf, group, exps, crapome):
     outfile = exps.to_adj_lst()
     # outfile.reset_index(inplace=True)
     outfile["confidence"] = outfile.apply(label_inte, axis=1)
-    crap = io.read_crap(crapome)
-    outfile["Frequency_crapome_ProtA"] = outfile["ProtA"].map(crap)
-    outfile["Frequency_crapome_ProtB"] = outfile["ProtB"].map(crap)
     outfile.fillna(0, inplace=True)
     outfile.to_csv(os.path.join(outname), sep="\t", index=False)
 
@@ -282,6 +369,7 @@ def gen_output(outf, group, exps, crapome):
     reshaped.reset_index(inplace=True)
     reshaped.columns = ["Protein", "interactors", "# interactors"]
     reshaped = reshaped[reshaped["Protein"] != reshaped["interactors"]]
+
     outname2 = os.path.join(outf, "prot_centr_{}.txt".format(group))
     reshaped.sort_values(by=["Protein"], inplace=True)
     reshaped.to_csv(os.path.join(outname2), sep="\t", index=False)
@@ -294,12 +382,41 @@ def estimate_background():
     pass
 
 
-def runner(tmp_, ids, outf, crapome, fdr):
+def runner(tmp_, ids, outf, fdr):
     """
-    read folder tmp in directory.
-    then loop for each file and create a combined file which contains all files
-    creates in the tmp directory
+    Processes experimental data, combines graphs, and generates output files.
+    Args:
+        tmp_ (str): Path to the temporary directory containing intermediate files.
+        ids (str): Path to a tab-separated file containing experiment information, 
+                    including group and sample details.
+        outf (str): Path to the output directory where results will be saved.
+    Workflow:
+        1. Reads experiment information from the `ids` file.
+        2. Groups experiments by the 'group' column in the `ids` file.
+        3. For each group:
+            - Reads and processes sample files.
+            - Converts data into network representations.
+            - Combines graphs and computes adjacency matrices.
+            - Filters edges based on weight thresholds.
+            - Generates group-specific output files, including:
+                - Probability files.
+                - Combined graph files.
+                - Adjacency matrices.
+                - Node ID pickle files.
+    Output:
+        - Group-specific probability files: "AllProbabilityRepl_<group_name>.txt"
+        - Combined graph files: "CombinedGraph_AllSamples_<group_name>.txt"
+        - Adjacency matrices: "adj_mult_<group_name>.csv"
+        - Node ID pickle files: "ids_<group_name>.pkl"
+    Notes:
+        - The function assumes specific file structures and naming conventions for input files.
+        - Filters edges with weights below 0.85 when creating the final graph.
+        - Uses NetworkX for graph operations and pandas for data manipulation.
+    Raises:
+        - FileNotFoundError: If input files or directories are missing.
+        - ValueError: If data formatting issues are encountered.
     """
+
     if not os.path.isdir(outf):
         os.makedirs(outf)
     dir_ = []
@@ -309,32 +426,36 @@ def runner(tmp_, ids, outf, crapome, fdr):
     groups = dict(zip(exp_info["group"], exp_info["short_id"]))
     allids = []
     gr_graphs = []
-    for k, v in groups.items():
+    for cnd, grp_info in exp_info.groupby('cond'):
+        allids = []
+        gr_graphs = []
         gr_exps = NetworkCombiner()
         grids = []
-        group_info = exp_info[exp_info["group"] == k]
-        for smpl in dir_:
-            base = os.path.basename(os.path.normpath(smpl))
-            fl = "./Input/{}.txt".format(base)
-            pass
-            if not group_info["Sample"].str.contains(fl).any():
-                continue
-            pred_out = os.path.join(smpl, "dnn.txt")
-            grids.extend(list(pd.read_csv(fl, sep="\t")["GN"]))
-            exp = TableConverter(table=pred_out, cond=pred_out, fdr=fdr)
-            exp.fdr_control()
+        for flname in grp_info['Sample']:
+            # this formats to keep only /tmp/xx -> xx which is the 
+            base = os.path.basename(os.path.normpath(flname))
+            tmp_filepath = os.path.join(tmp_, base.replace('.txt', ''))
+            pred_out = os.path.join(tmp_filepath, "dnn.txt")
+            tmp = list(pd.read_csv(flname, sep='\t')["GN"])
+            grids.extend(tmp)
+            exp = TableConverter(path=pred_out, df=pd.read_csv(pred_out, sep='\t'), cond=cnd, fdr=fdr)
+            exp.fdr_control(plot=True)
             exp.convert_to_network()
-            exp.weight_adj_matrx(smpl, write=True)
+            exp.weight_adj_matrx(tmp_filepath, write=True)
             gr_exps.add_exp(exp)
+        
         gr_exps.create_dfs()
         gr_exps.combine_graphs(grids)
         gr_exps.adj_matrix_multi()
         allprobs = gr_exps.multi_prob_out()
-        allprobs.to_csv(os.path.join(outf, "probtot_{}.txt".format(v)), sep="\t")
+        grp_name = grp_info['short_id'].values[0]
+        allprobs = allprobs[~allprobs["weight"].isna()]
+        allprobs.to_csv(os.path.join(outf, "probtot_{}.txt".format(grp_name)), sep="\t")
         # group specific graph
         gr_graphs.append(gr_exps.get_gr_network())
-        gen_output(outf, v, gr_exps, crapome)
+        gen_output(outf, cnd, gr_exps)
         allids.extend(grids)
+        
     G2 = gr_graphs.pop()
     # here select max interaction score per ppi across baits
     for g in gr_graphs:

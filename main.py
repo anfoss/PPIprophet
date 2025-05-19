@@ -50,7 +50,7 @@ def create_config():
         help='global FDR threshold',
         dest='fdr',
         action='store',
-        default=0.5,
+        default=0.1,
     )
     # maybe better to add function for generating a dummy sample id?
     parser.add_argument(
@@ -82,6 +82,14 @@ def create_config():
         default=0.5,
         type=float
     )
+    parser.add_argument(
+        '-skip',
+        help='skip the preprocessing step',
+        dest='skip',
+        action='store',
+        default='False',
+        type=str
+    )
     args = parser.parse_args()
 
     # create config file
@@ -94,6 +102,7 @@ def create_config():
         'out': args.out,
         'crapome': args.crap,
         'thresh': args.thres,
+        'skip': args.skip,
     }
 
     # create config ini file for backup
@@ -113,21 +122,12 @@ def main():
     validate.InputTester(config['GLOBAL']['sid'], 'ids').test_file()
     files = io.read_sample_ids(config['GLOBAL']['sid'])
     files = [os.path.abspath(x) for x in files.keys()]
-    multi=False
-    if multi == "True":
-        p = mult_proc.Pool(len(files))
-        preproc_conf = partial(preprocessing, config=config)
-        p.map(preproc_conf, files)
-        p.close()
-        p.join()
-    else:
+    if config['GLOBAL']['skip'] == 'False':
         [preprocessing(infile, config) for infile in files]
-
     combine.runner(
                 tmp_=config['GLOBAL']['temp'],
                 ids=config['GLOBAL']['sid'],
                 outf=config['GLOBAL']['out'],
-                crapome=config['GLOBAL']['crapome'],
                 fdr=config['GLOBAL']['fdr']
                 )
     score.runner(

@@ -74,7 +74,7 @@ def plot_fdr(target, decoy, cutoff, fdr, plotname):
     plt.show()
     plt.savefig(plotname, dpi=800, bbox_inches="tight")
     plt.close()
-    
+
     return True
 
 
@@ -92,13 +92,9 @@ def calc_fdr(target, decoy):
         nt = np.where(target >= s)[0].shape[0] / target.shape[0]
         nd = np.where(decoy >= s)[0].shape[0] / decoy.shape[0]
         if nt == 0 or (nd / nt) > 1.0:
-            fdr[
-                i,
-            ] = (nt, nd, 1.0, s)
+            fdr[i,] = (nt, nd, 1.0, s)
         else:
-            fdr[
-                i,
-            ] = (nt, nd, nd / nt, s)
+            fdr[i,] = (nt, nd, nd / nt, s)
     return fdr
 
 
@@ -131,7 +127,7 @@ def vec_wd_score(arr, norm):
         return np.zeros(arr.shape)
     ntot = pres + npres
     mu_ = np.sum(arr) / ntot
-    sum_sq_err = np.sum((arr - mu_) ** 2) + ((mu_ ** 2) * npres)
+    sum_sq_err = np.sum((arr - mu_) ** 2) + ((mu_**2) * npres)
     sd_prey = np.sqrt(sum_sq_err / (ntot - 1))
     wj = sd_prey / mu_
     if wj < 1:
@@ -293,9 +289,9 @@ def runner(tmp_, outf, crapome, thresh):
     df.to_csv(os.path.join(outf, "d_scores.txt"), sep="\t", index=False)
     # now we need to filter m
 
-    m, ids = preprocess_matrix(m, ids)
-    clusters = rec_mcl(m)
-    output_from_clusters(ids, clusters, outf)
+    # m, ids = preprocess_matrix(m, ids)
+    # clusters = rec_mcl(m)
+    # output_from_clusters(ids, clusters, outf)
     # m[m==0]=10**-17
     # G = nx.from_numpy_array(m)
     # # G = nx.relabel_nodes(G,dict(zip(G.nodes, ids)))

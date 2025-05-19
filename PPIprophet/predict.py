@@ -12,21 +12,22 @@ from PPIprophet import io_ as io
 
 
 def mcc(y_true, y_pred):
-    y_pred_pos = K.round(K.clip(y_pred, 0, 1))
+    y_pred_pos = tf.round(tf.clip_by_value(y_pred, 0, 1))
     y_pred_neg = 1 - y_pred_pos
 
-    y_pos = K.round(K.clip(y_true, 0, 1))
+    y_pos = tf.round(tf.clip_by_value(y_true, 0, 1))
     y_neg = 1 - y_pos
 
-    tp = K.sum(y_pos * y_pred_pos)
-    tn = K.sum(y_neg * y_pred_neg)
+    tp = tf.reduce_sum(y_pos * y_pred_pos)
+    tn = tf.reduce_sum(y_neg * y_pred_neg)
 
-    fp = K.sum(y_neg * y_pred_pos)
-    fn = K.sum(y_pos * y_pred_neg)
+    fp = tf.reduce_sum(y_neg * y_pred_pos)
+    fn = tf.reduce_sum(y_pos * y_pred_neg)
 
-    numerator = tp * tn - fp * fn
-    denominator = K.sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn))
-    return numerator / (denominator + K.epsilon())
+    numerator = (tp * tn) - (fp * fn)
+    denominator = tf.sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn))
+
+    return tf.where(tf.math.equal(denominator, 0), 0.0, numerator / denominator)
 
 
 def plot_probability(df, path):
@@ -50,10 +51,14 @@ def plot_probability(df, path):
 
 
 # @io.timeit
-def runner(base, modelname="./PPIprophet/model_ppi_144.h5", chunks=True):
+# TODO avoid prepare feat and just have direclty a numpy array
+def runner(base, modelname="./PPIprophet/model_ppi_144.keras", chunks=True):
     infile = os.path.join(base, "mp_feat_norm.txt")
-    model = tf.keras.models.load_model(modelname, custom_objects={"mcc": mcc})
-    chunk_size = 300000
+    model = tf.keras.models.load_model(
+        modelname, custom_objects={"mcc": mcc}, compile=False
+    )
+    model.compile(optimizer="adam", loss="binary_crossentropy", metrics=[mcc])
+    chunk_size = 30000
     missing = ["nan", "na", "", None, "n", "-"]
     arr = np.array([])
     for chunk in pd.read_csv(infile, sep="\t", na_values=missing, chunksize=chunk_size):
@@ -64,14 +69,14 @@ def runner(base, modelname="./PPIprophet/model_ppi_144.h5", chunks=True):
         else:
             arr = np.column_stack([memo, yhat_probs])
     df = pd.DataFrame(arr, columns=["protS", "Prob"])
-    df["ProtA"], df["ProtB"] = df["protS"].str.split("#", 1).str
-    isdecoy = ["DECOY" if "_DECOY" in x else "TARGET" for x in df["ProtA"]]
-    df["isdecoy"] = isdecoy
+    df[["ProtA", "ProtB"]] = df["protS"].str.split("#", expand=True)
+    df["isdecoy"] = ["DECOY" if "_DECOY" in x else "TARGET" for x in df["ProtA"]]
     df.drop("protS", inplace=True, axis=1)
     df = df[["ProtA", "ProtB", "Prob", "isdecoy"]]
     # cleanup string to remove _p_0 from middle
-    df["ProtA"] = [re.sub("_p_.", "", x) for x in df["ProtA"]]
-    df["ProtB"] = [re.sub("_p_.", "", x) for x in df["ProtB"]]
-    pred_path = os.path.join(base, "dnn.txt")
-    df.to_csv(pred_path, sep="\t", index=False)
+    unique_proteins = pd.unique(df[["ProtA", "ProtB"]].values.ravel("K"))
+    protein_map = {protein: re.sub("_p_.", "", protein) for protein in unique_proteins}
+    df["ProtA"] = df["ProtA"].map(protein_map)
+    df["ProtB"] = df["ProtB"].map(protein_map)
+    df.to_csv(os.path.join(base, "dnn.txt"), sep="\t", index=False)
     plot_probability(df, os.path.join(base, "prob.pdf"))

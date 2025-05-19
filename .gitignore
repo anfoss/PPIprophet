@@ -151,3 +151,9 @@ Output/*
 Input/*
 tmp/*
 Output_uxt_split/*
+sample_ids2 copy.txt
+.gitignore
+Output/communities.txt
+sample_ids2.txt
+test.ipynb
+PPIprophet/model_ppi_144.h5
