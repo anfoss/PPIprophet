@@ -85,22 +85,23 @@ class NetworkCombiner(object):
             the edge weight (probability) from the X-th graph. Rows with all NaN weights are dropped.
         """
         allprobs = []
-        for G in self.networks:
-            # adj = nx.adjacency_matrix(G, nodelist=self.ids, weight="weight")
+        for i, G in enumerate(self.networks):
             df = nx.to_pandas_edgelist(G)
             df2 = df.copy()
             df2.columns = ["target", "source", "weight"]
             df2 = df2[["source", "target", "weight"]]
             df = pd.concat([df, df2])
+            df = df.groupby(["source", "target"], as_index=False).sum()
+            df.rename(columns={"weight": f"weight_{i}"}, inplace=True)
             allprobs.append(df)
-        tots = reduce(
-            lambda l, r: pd.merge(l, r, on=["source", "target"], how="outer"), allprobs
-        )
-        # replace interactions with all NAN to 0
-        tots.set_index(["source", "target"])
+
+        tots = reduce(lambda l, r: pd.merge(l, r, on=["source", "target"], how="outer"), allprobs)
+        tots = tots[tots['source']!= tots['target']]
+        tots = tots.set_index(["source", "target"])
         tots = tots.replace(10**-17, np.nan)
-        tots.dropna(how="all", axis=0, inplace=True)
+        tots.dropna(how="all", inplace=True)
         return tots
+
 
     def calc_freq(self, all_adj):
         """
@@ -152,36 +153,62 @@ class NetworkCombiner(object):
             self.adj_matrx (numpy.ndarray): The resulting combined adjacency matrix.
             self.comb_net (networkx.Graph): The resulting combined networkx graph.
         """        
+        # all_adj = []
+        # # enforce same order
+        # self.ids = sorted(list(map(str, self.networks[0].nodes())))
+        # for G in self.networks:
+        #     adj = nx.adjacency_matrix(G, nodelist=self.ids, weight="weight")
+        #     all_adj.append(adj.todense())
+        # if self.combine == "prob":
+        #     # adj matrix with max prob (no filter)
+        #     self.adj_matrx = np.maximum.reduce(all_adj)
+        # elif self.combine == "comb":
+        #     # now multiply probabilities
+        #     self.adj_matrx = all_adj.pop()
+        #     for m1 in all_adj:
+        #         self.adj_matrx = np.multiply(self.adj_matrx, m1)
+        #         # self.adj_matrx = np.add(self.adj_matrx, m1)
+        # elif self.combine == "mean":
+        #     self.adj_matrx = all_adj.pop()
+        #     for m1 in all_adj:
+        #         self.adj_matrx = np.add(self.adj_matrx, m1)
+        #     self.adj_matrx = self.adj_matrx / (len(all_adj) + 1)
+        # # calculate frequency
+        # # freq = self.calc_freq(all_adj)
+        # # self.adj_matrx = self.desi_f(freq, self.adj_matrx)
+        # # convert to network and return
+        # # nodes are alphabetically ordered
+        # self.comb_net = nx.from_numpy_array(self.adj_matrx)
+        # self.comb_net = nx.relabel_nodes(
+        #     self.comb_net, dict(zip(self.comb_net.nodes, self.ids), copy=False)
+        # )
+        # return self.adj_matrx
+        all_ids = sorted(set().union(*[map(str, G.nodes()) for G in self.networks]))
+        self.ids = all_ids  # Store for later use
+        
+        # Build aligned adjacency matrices (fill missing nodes with 0s)
         all_adj = []
-        # enforce same order
-        self.ids = sorted(list(map(str, self.networks[0].nodes())))
         for G in self.networks:
-            adj = nx.adjacency_matrix(G, nodelist=self.ids, weight="weight")
-            all_adj.append(adj.todense())
+            adj = nx.to_numpy_array(G, nodelist=self.ids, weight="weight", nonedge=0.0)
+            all_adj.append(adj)
+
+        all_adj = np.stack(all_adj)  # shape: (n_networks, n_nodes, n_nodes)
+
         if self.combine == "prob":
-            # adj matrix with max prob (no filter)
-            self.adj_matrx = np.maximum.reduce(all_adj)
+            self.adj_matrx = np.max(all_adj, axis=0)
         elif self.combine == "comb":
-            # now multiply probabilities
-            self.adj_matrx = all_adj.pop()
-            for m1 in all_adj:
-                self.adj_matrx = np.multiply(self.adj_matrx, m1)
-                # self.adj_matrx = np.add(self.adj_matrx, m1)
+            self.adj_matrx = np.prod(all_adj, axis=0)
         elif self.combine == "mean":
-            self.adj_matrx = all_adj.pop()
-            for m1 in all_adj:
-                self.adj_matrx = np.add(self.adj_matrx, m1)
-            self.adj_matrx = self.adj_matrx / (len(all_adj) + 1)
-        # calculate frequency
-        # freq = self.calc_freq(all_adj)
-        # self.adj_matrx = self.desi_f(freq, self.adj_matrx)
-        # convert to network and return
-        # nodes are alphabetically ordered
+            self.adj_matrx = np.mean(all_adj, axis=0)
+        else:
+            raise ValueError(f"Unknown combine method: {self.combine}")
+
         self.comb_net = nx.from_numpy_array(self.adj_matrx)
         self.comb_net = nx.relabel_nodes(
-            self.comb_net, dict(zip(self.comb_net.nodes, self.ids), copy=False)
+            self.comb_net, dict(zip(self.comb_net.nodes, self.ids)), copy=False
         )
         return self.adj_matrx
+
 
     def to_adj_lst(self):
         """
@@ -449,7 +476,8 @@ def runner(tmp_, ids, outf, fdr):
         gr_exps.adj_matrix_multi()
         allprobs = gr_exps.multi_prob_out()
         grp_name = grp_info['short_id'].values[0]
-        allprobs = allprobs[~allprobs["weight"].isna()]
+        print(allprobs)
+        # allprobs = allprobs[~allprobs["weight"].isna()]
         allprobs.to_csv(os.path.join(outf, "probtot_{}.txt".format(grp_name)), sep="\t")
         # group specific graph
         gr_graphs.append(gr_exps.get_gr_network())

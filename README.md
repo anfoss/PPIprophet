@@ -1,135 +1,157 @@
-## PPIprophet instruction
+# PPIprophet: Protein-Protein Interaction Prediction Suite
 
-After successfully installing all the dependencies, the following command can be directly run to test PPIprophet with the example dataset (i.e. test/test_fract.txt):
-```
-python3 main.py -sid test/test_ids.txt
-```
-The default input and output folders are '/test/' and '/Output/' respectively,
-under the PPIprophet working folder. It will generally take ~1 hr per file to
-finish but the computation time increases exponentially depending on the nr of
-protein ids in the file. We suggest to employ an high performance computing
-environment if submitting a whole proteome search and not an affinity purified sample.  
+PPIprophet is a Python tool for predicting protein-protein interactions (PPIs) from proteomics data. It supports a variety of quantitation schemes and provides results compatible with Cytoscape for network analysis. This README covers installation, input formats, parameter configuration, running the tool, and interpreting results.
 
-In the PPIprophet package, all parameters can be configured either via the ‘ProphetConfig.conf’ file or via by running PPIprophet using the command. When running the PPIprophet, the parameters indicated in the command will be written into the ‘ProphetConfig.conf’ file. Generally, four types of features are needed:
+---
 
+## Table of Contents
+- [PPIprophet: Protein-Protein Interaction Prediction Suite](#ppiprophet-protein-protein-interaction-prediction-suite)
+  - [Table of Contents](#table-of-contents)
+  - [Overview](#overview)
+  - [Installation](#installation)
+  - [Input File Format](#input-file-format)
+  - [Experimental Information File](#experimental-information-file)
+  - [Parameter Configuration](#parameter-configuration)
+  - [Running PPIprophet](#running-ppiprophet)
+  - [Output Files](#output-files)
+  - [Importing Results into Cytoscape](#importing-results-into-cytoscape)
+  - [Troubleshooting](#troubleshooting)
+  - [Contact](#contact)
 
-## Input file
+---
 
-Input file need to be a wide format matrix with two essential columns:
+## Overview
+PPIprophet predicts protein-protein interactions from proteomics data using deep learning and network analysis. It is highly configurable and supports various input formats and quantitation schemes (MS1/MS2 XIC, spectral counts, TMT, SILAC, etc.).
 
-__GN__ : Gene name or protein id, needs to be the first column. This is a
-unique identifier and having duplicate rows will trigger a DuplicateError from PPIprophet.
+PPIprophet is designed for co-fractionation MS experiments and large-scale PPI prediction.
 
-Remaining columns needs to be ordered according to the fractionation scheme used. There is no strict requirement for column names apart from GN and ID, but they need to be ordered.
-All quantitation schemes commonly used in proteomics such as MS1 or MS2 ion-extracted chromatogram (XIC), spectral counts (SPCs) and TMT or SILAC ratios are supported.
+---
 
-Examples of correct formatting are provided under test/test_fract.txt data.
+## Installation
+1. Clone the repository and navigate to the project folder.
+2. Install dependencies:
+   ```sh
+   pip install -r requirements.txt
+   ```
 
-### Parameter setup
+---
 
+## Input File Format
+Input files must be wide-format matrices with these requirements:
+- **First column:** `GN` (Gene name or protein ID, unique for each row)
+- **Remaining columns:** Quantitation values, ordered by fractionation scheme (column names are flexible)
 
-##### Global parameters:
+**Note:** Duplicate rows in the `GN` column will trigger an error.
 
-```
--output The output folder
--sid  Sample identifier file
-```
+Example:
 
-##### Pre-processing parameters:
+| GN | Fraction1 | Fraction2 | ... |
+|----|-----------|-----------|-----|
+| A  | 20400     | ...       |     |
+| D  | 1230120   | ...       |     |
+| C  | 1230120   | ...       |     |
 
-```
--all  The number of fractions to use [1, X].
--is_ppi Is the provided database a PPI network or a complex database
--ma  Choose ‘all’ for using data-driven+database based hypothesis generation and ‘reference’ use only database derived complexes
+All common proteomics quantitation schemes are supported. Example files are provided in `test/test_fract.txt`.
 
-```
+---
 
+## Experimental Information File
+The sample IDs file (e.g., `sample_ids.txt`) must have the following columns:
 
-##### Post-processing parameters:
+| Sample              | cond   | group | short_id   | repl | fr |
+|---------------------|--------|-------|------------|------|----|
+| ./Input/c1r1.txt    | Ctrl   | 1     | ipsc_2i_1  | 1    | 65 |
+| ./Input/c1r2.txt    | Ctrl   | 1     | ipsc_2i_2  | 2    | 64 |
+| ./Input/c1r3.txt    | Ctrl   | 1     | ipsc_2i_3  | 3    | 65 |
+| ./Input/c2r1.txt    | Treat1 | 2     | ipsc_ra_1  | 1    | 65 |
+| ./Input/c2r2.txt    | Treat1 | 2     | ipsc_ra_2  | 2    | 65 |
+| ./Input/c2r3.txt    | Treat1 | 2     | ipsc_ra_3  | 3    | 65 |
 
-```
--fdr  False discovery rate for hypothesis 0 > FDR > 1
+- **Sample:** Full path to the file to process (must match the actual filename)
+- **cond:** Condition name (`Ctrl`, `Treat1`, `Treat2`, etc.)
+- **group:** Group number (1 for control)
+- **short_id:** Alternative ID
+- **repl:** Replicate number
+- **fr:** Number of fractions per file
 
-```
+**Note:**
+- The `Sample` column must match the input file names exactly (including extension).
+- For multiple conditions, use `Ctrl`, `Treat1`, `Treat2`, etc. as labels.
 
+---
 
-all parameters can be inspected using
+## Parameter Configuration
+Parameters can be set via the `ProphetConfig.conf` file or directly on the command line. Command-line parameters override the config file and are saved to it.
 
-```
+| Argument   | Description                                       | Default           |
+| ---------- | ------------------------------------------------- | ----------------- |
+| `-db`      | Path to PPI network file (STRING format)           | `None`            |
+| `-fdr`     | Global FDR threshold                              | `0.3`             |
+| `-sid`     | Path to sample IDs file                           | `sample_ids.txt`  |
+| `-out`     | Output folder name                                | `Output`          |
+| `-crapome` | Crapome contaminant reference file (optional)     | `crapome.org.txt` |
+| `-thresh`  | Frequency threshold for Crapome filtering         | `0.5`             |
+| `-skip`    | Skip preprocessing/feature generation (`True`/`False`) | `False`       |
+
+To see all available parameters:
+
+```sh
 python3 main.py --help
 ```
 
 ---
-### Writing the experimental information file
-The file ‘sample_ids.txt’ stores the experimental information and needs to contain the following headers:
 
-| Sample     | cond      |group|short_id|repl|fr|
-| :----------| :---------| :---|:-------|:---|:-|
+## Running PPIprophet
+After installing dependencies, you can test PPIprophet with the example dataset:
 
-- __Sample__ full path of the file intended to be processed
-- __cond__ condition name
-- __group__ group number (integer, needs to be 1 for control)
-- __short_id__ alternative id
-- __repl__ replicate number within the contiions
-- __fr__ number of fractions per file
-
-
-> **Note:**  In the ‘Sample’ column, please make sure that the content is identical with the testing file name (with the file extension). In the ‘cond’ column, if you have multiple conditions, please label them exactly as ‘Ctrl’, ‘Treat1’, and ‘Treat2’ etc. Failure to do so will cause problems when running PPIprophet.
-
-Here is an example of a complete table with two conditions and three replicates:
-
-| Sample     | cond      |group|short_id|repl|fr|
-| :----------| :----- |:-----|:-----|:-----|:-----|
-| ./Input/c1r1.txt     | Ctrl      |1|ipsc_2i_1|1|65|
-| ./Input/c1r2.txt     | Ctrl      |1|ipsc_2i_2|2|64|
-| ./Input/c1r3.txt     | Ctrl      |1|ipsc_2i_3|3|65|
-| ./Input/c2r1.txt     | Treat1      |2|ipsc_ra_1|1|65|
-| ./Input/c2r2.txt     | Treat1      |2|ipsc_ra_2|2|65|
-| ./Input/c2r3.txt     | Treat1      |2|ipsc_ra_3|3|65|
-
-
-
----
-### Running PPIprophet
-
-PPIprophet can be using all default settings with
-
-
+```sh
+python3 main.py -sid test/test_ids.txt
 ```
+
+To run with all default settings:
+
+```sh
 python3 main.py
 ```
 
+To specify parameters, use command-line arguments. For example, to use a custom interaction network and a 10% FDR:
 
-----
+```sh
+python3 main.py -db myppi.txt -fdr 0.1
+```
 
-### Interpreting prediction results
-There will be two folders generated by the PPIprophet, including the ‘tmp’ folder and the user designated ‘Output’ folder. The ‘tmp’ folder stores all the intermediate files for PPIprophet to process and therefore can be used for debugging and validation. The ‘tmp’ folder can be safely deleted after PPIprophet finishes all the prediction and analysis. 
+---
 
-The ‘Output’ folder, on the other hand, harboured all the output files generated by PPIprophet.
+## Output Files
+PPIprophet generates two main folders:
+- `tmp/`: Intermediate files for debugging/validation (can be deleted after completion)
+- `Output/`: Final results, including:
+  - `adj_list.txt`: PPI list (proteinA/proteinB/Probability) and Crapome frequencies
+  - `communities.txt`: Modules detected after clustering
+  - `d_scores.txt`: Interaction probabilities as modified WD scores
+  - `probtot.txt`: Adjacency list with filtered interactions (FDR applied)
+  - `prot_centr.txt`: Protein-centric interactors list
 
-In the output folder the following text files are present:
+File names may vary slightly depending on the run (see output folder for details).
 
-- __adj_list.txt__: PPI list in the form proteinA/proteinB/Probability (from DNN prediction) and Crapome frequencies for both proteins.
-- __communities.txt__: Modules detected after MCL clustering of the modified WD scores.
-- __d_scores.txt__: Interaction probabilities converted to modified WD scores (see paper for mathematical description and derivation)
-- __probtot.txt__: adjacency list where proteins having interaction below the scored thresholds (at the user specified FDR) are zeroed. Users can find the full scored matrix (prior to FDR filtering) in tmp/dnn.txt
-- __prot_centr.txt__: Protein-centric output where for every protein entry all the identified interactors are concatenated.
+---
 
+## Importing Results into Cytoscape
+- `probtot.txt` and `d_scores.txt` can be imported directly into Cytoscape.
+- `adj_list.txt` can be used to visualize interaction frequencies.
 
-### Import results into Cytoscape
+---
 
-Both __probtot.txt__,   __d_scores.txt__ are fully compatible with Cytoscape import without the need for any additional formatting. For additional mapping __adj_list.txt__ can be used to visualize frequency of interactions in crapome.
+## Troubleshooting
+Common errors and solutions:
+- **NaRowError / NaInMatrixError:** 'NA' values in input; replace with 0.
+- **MissingColumnError:** Required columns (`GN` or `ID`) missing.
+- **DuplicateRowError / DuplicateIdentifierError:** Duplicate entries in `GN` column; ensure uniqueness.
+- **EmptyColumnError:** A column contains only 'NA'.
 
-### PPIprophet specific exceptions and errors
+*Tip:* If files have different numbers of fractions, add zero-filled columns as needed.
 
-Depending on the error raised different fixes are needed.
+---
 
-- __NaRowError / NaInMatrixError__: There are 'NA' values in the input matrix, substitute them with 0
-- __MissingColumnError__: Identifier columns (GN or ID) are missing
-- __DuplicateRowError / DuplicateIdentifierError__: There are duplicates in the GN column. A common cause of this is mapping of isoform to the same gene name. Just add \_1 to one of the duplicate gene names
-- __EmptyColumnError__: A column is only NA
-
-*Note* for imputing column values in case of different number of fractions add a full 0 column
-
-### Contact
-Please refer to [README.md](https://github.com/fossatiA/PPIprophet/blob/master/README.md) for how to contact us.
+## Contact
+For questions or support, see the [project README on GitHub](https://github.com/fossatiA/PPIprophet/blob/master/README.md).

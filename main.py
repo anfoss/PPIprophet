@@ -5,7 +5,6 @@ import configparser
 import sys
 import os
 import platform
-import multiprocessing.dummy as mult_proc
 from functools import partial
 
 
